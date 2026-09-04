@@ -3,6 +3,9 @@
 Official PHP SDK for the [SUQO](https://suqo.ai) API. Implements **SUQO SDK —
 Specification v2.0**; binding decisions are recorded in [BINDING.md](BINDING.md).
 
+This page is the quick start. For a per-method reference — every parameter, return
+type and thrown exception — see **[docs/](docs/README.md)**.
+
 Requires PHP 8.1+ with `ext-curl`, `ext-json` and `ext-hash`.
 
 ```bash
@@ -21,6 +24,8 @@ The environment is inferred from the key prefix — `su_test_key_` is sandbox,
 `su_key_` is live. Passing `environment:` is a *check*, never an override: it can
 only agree with the prefix or raise `SuqoConfigError`.
 
+*Full reference: [docs/client.md](docs/client.md).*
+
 ```php
 $suqo = new SuqoClient(
     apiKey: 'su_test_key_…',
@@ -32,6 +37,8 @@ $suqo = new SuqoClient(
 ```
 
 ## Products
+
+*Full reference: [docs/products.md](docs/products.md).*
 
 ```php
 $page = $suqo->products->list(page: 1, pageSize: 50);
@@ -60,6 +67,8 @@ foreach ($suqo->products->autoPaging() as $product) {
 ```
 
 ## Subscriptions
+
+*Full reference: [docs/subscriptions.md](docs/subscriptions.md).*
 
 ```php
 use Suqo\Params\CreateSubscriptionParams;
@@ -155,6 +164,8 @@ $total = bcmul($subscription->product->price, '2', 2);
 
 ## Errors
 
+*Full reference: [docs/errors.md](docs/errors.md).*
+
 Every SDK error derives from `Suqo\Exception\SuqoError` and carries `status`,
 `requestId`, `rawBody`, `fieldErrors` and `retryAfter`.
 
@@ -197,6 +208,8 @@ construction, before any request exists.
 
 ## Retries
 
+*Full reference: [docs/http.md#retrypolicy](docs/http.md#retrypolicy).*
+
 `GET` requests are retried up to twice — three attempts total — on a network
 failure, a timeout, a 429 or a 5xx. Writes are not retried, pending idempotency
 keys. Backoff is full jitter over 500 ms → 1 s → … capped at 8 s, and a
@@ -204,6 +217,8 @@ server-supplied `Retry-After` wins over the computed delay (capped at 60 s).
 Absolute-URL page fetches take the same policy as page 1.
 
 ## Cancellation
+
+*Full reference: [docs/http.md#cancellation](docs/http.md#cancellation).*
 
 ```php
 use Suqo\Cancellation;
@@ -222,6 +237,8 @@ distinct from the `NetworkError` a timeout produces. It is honoured before an
 attempt, mid-flight, during backoff, and between pages.
 
 ## Webhooks
+
+*Full reference: [docs/webhooks.md](docs/webhooks.md).*
 
 Verification needs no client, no API key and no network — call it straight from a
 serverless handler. It never throws; every failure path returns `false`.
@@ -248,6 +265,8 @@ freshness window is 300 s back (configurable via `maxAge`) and a fixed 60 s
 forward.
 
 ## Injecting an HTTP client
+
+*Full reference: [docs/http.md#injecting-a-client](docs/http.md#injecting-a-client).*
 
 ```php
 use Suqo\Http\CurlHttpClient;
