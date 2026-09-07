@@ -32,6 +32,11 @@ final class Wire
      * double or decimal type inside the SDK. A numeric wire value is stringified
      * rather than rejected, but the API is specified to send strings.
      *
+     * A JSON float has already lost precision by the time json_decode hands it
+     * over, so it is stringified with the shortest representation that round
+     * trips back to the same double. Non-finite values, and the magnitudes that
+     * only render in exponent form, have no decimal spelling and read as absent.
+     *
      * @param array<string, mixed> $wire
      */
     public static function decimal(array $wire, string $key): ?string
@@ -46,7 +51,34 @@ final class Wire
             return (string) $value;
         }
 
+        if (is_float($value)) {
+            return self::floatRepr($value);
+        }
+
         return null;
+    }
+
+    /**
+     * The shortest plain-decimal spelling of a JSON float that round trips back
+     * to the same value, or null when it has none. json_encode applies
+     * serialize_precision=-1 semantics, refuses NAN and INF, and renders
+     * magnitudes outside plain-decimal range in exponent form. The value itself
+     * is never cast to a float, double or decimal type (§9.1, I5) — it arrives
+     * as one from json_decode and leaves as a string.
+     */
+    private static function floatRepr(mixed $value): ?string
+    {
+        if (!is_float($value)) {
+            return null;
+        }
+
+        $encoded = json_encode($value);
+
+        if (!is_string($encoded) || preg_match('/[eE]/', $encoded) === 1) {
+            return null;
+        }
+
+        return $encoded;
     }
 
     /** @param array<string, mixed> $wire */
@@ -67,6 +99,9 @@ final class Wire
      * An integral count that the API may render as either a JSON number or a
      * numeric string. Counts are not monetary values, so §9.1 does not apply.
      *
+     * A JSON float is accepted only when it spells a plain integer; a fractional
+     * or out-of-range float is not a count and reads as absent.
+     *
      * @param array<string, mixed> $wire
      */
     public static function count(array $wire, string $key): ?int
@@ -79,6 +114,12 @@ final class Wire
 
         if (is_string($value) && $value !== '' && ctype_digit(ltrim($value, '-'))) {
             return (int) $value;
+        }
+
+        $repr = self::floatRepr($value);
+
+        if ($repr !== null && ctype_digit(ltrim($repr, '-'))) {
+            return (int) $repr;
         }
 
         return null;

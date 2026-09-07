@@ -46,7 +46,7 @@ final class Config
             throw new SuqoConfigError(Constants::MSG_MALFORMED_KEY);
         }
 
-        // Order matters: both prefixes begin with "su_".
+        // The two prefixes diverge at the 4th character, so either order works.
         if (str_starts_with($key, Constants::SANDBOX_KEY_PREFIX)) {
             $inferred = Environment::Sandbox;
         } elseif (str_starts_with($key, Constants::LIVE_KEY_PREFIX)) {
