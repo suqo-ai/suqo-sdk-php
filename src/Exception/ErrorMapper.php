@@ -16,6 +16,7 @@ final class ErrorMapper
     private const KIND_KYC = 'kyc';
     private const KIND_DETAIL = 'detail';
     private const KIND_FIELD = 'field';
+    private const KIND_MESSAGES = 'messages';
 
     /**
      * §8.4 — map an HTTP status and parsed body onto an error type.
@@ -51,8 +52,8 @@ final class ErrorMapper
                 $retryAfter,
                 $c['kycStatus'],
             ),
-            $status === 403 => new SuqoError(
-                'Unexpected status 403.',
+            $status === 403 => new PermissionDeniedError(
+                $classified ?? 'You are not authorized to access this resource.',
                 $status,
                 $requestId,
                 $body,
@@ -84,15 +85,15 @@ final class ErrorMapper
                 $retryAfter,
             ),
             $status >= 500 => new ServerError(
-                sprintf('Server error (%d).', $status),
+                $classified ?? sprintf('Server error (%d).', $status),
                 $status,
                 $requestId,
                 $body,
                 [],
                 $retryAfter,
             ),
-            default => new SuqoError(
-                sprintf('Unexpected status %d.', $status),
+            default => new ServerError(
+                $classified ?? sprintf('Request failed with status %d.', $status),
                 $status,
                 $requestId,
                 $body,
@@ -110,6 +111,24 @@ final class ErrorMapper
     private static function classify(mixed $body): array
     {
         $none = ['kind' => self::KIND_NONE, 'message' => null, 'fieldErrors' => [], 'kycStatus' => null];
+
+        // 0. A bare list of strings. `subscriptions.cancel` and `.resume` answer
+        // an illegal state transition with `["Cannot cancel subscription while
+        // it is cancelled."]` rather than the field-keyed object every other 400
+        // uses. Surfacing the first entry as the message is the whole point;
+        // treating it as a field error under the key "0" would not be.
+        // An empty array is excluded: json_decode renders `{}` and `[]`
+        // identically, so treating `[]` as a message list would reclassify an
+        // empty object too.
+        if ($body !== [] && self::isStringList($body)) {
+            /** @var non-empty-list<string> $body */
+            return [
+                'kind' => self::KIND_MESSAGES,
+                'message' => $body[0],
+                'fieldErrors' => [],
+                'kycStatus' => null,
+            ];
+        }
 
         if (!self::isWireObject($body)) {
             return $none;
@@ -140,18 +159,10 @@ final class ErrorMapper
             ];
         }
 
-        // 3. Field errors: collect string and string-list values.
+        // 3. Field errors, collected depth-first into dotted paths.
         // B12: PHP's json_decode preserves JSON document order, so "first
         // entry" below is the first key in the response body.
-        $fields = [];
-        foreach ($body as $key => $value) {
-            if (is_string($value)) {
-                $fields[(string) $key] = [$value];
-            } elseif (self::isStringList($value)) {
-                /** @var list<string> $value */
-                $fields[(string) $key] = array_values($value);
-            }
-        }
+        $fields = self::collectFieldErrors($body);
 
         $first = null;
         foreach ($fields as $values) {
@@ -177,6 +188,48 @@ final class ErrorMapper
     private static function isWireObject(mixed $body): bool
     {
         return is_array($body) && ($body === [] || !array_is_list($body));
+    }
+
+    /**
+     * Walk a decoded error body into `path => messages`, where a nested object
+     * contributes a dotted path (`client.billing.email`). N8 keeps `rawBody`
+     * spelled the way the wire spelled it, but `fieldErrors` is SDK surface, so
+     * a top-level `client` key is renamed to `customer` here to match §3 — and
+     * only at the top level, because that is the only place the rename applies.
+     *
+     * Keys are `array-key`, not `string`: json_decode(assoc) turns a numeric
+     * JSON key into an int, so `{"0": "…"}` arrives with an integer key. Each is
+     * cast below before it becomes part of a path.
+     *
+     * @param  array<array-key, mixed>     $body
+     * @return array<string, list<string>>
+     */
+    private static function collectFieldErrors(array $body, string $prefix = ''): array
+    {
+        $fields = [];
+
+        foreach ($body as $key => $value) {
+            $name = (string) $key;
+
+            if ($prefix === '' && $name === 'client') {
+                $name = 'customer';
+            }
+
+            $path = $prefix === '' ? $name : $prefix . '.' . $name;
+
+            if (is_string($value)) {
+                $fields[$path] = [$value];
+            } elseif (self::isStringList($value)) {
+                /** @var list<string> $value */
+                $fields[$path] = array_values($value);
+            } elseif (is_array($value) && self::isWireObject($value)) {
+                foreach (self::collectFieldErrors($value, $path) as $nested => $messages) {
+                    $fields[$nested] = $messages;
+                }
+            }
+        }
+
+        return $fields;
     }
 
     private static function isStringList(mixed $value): bool

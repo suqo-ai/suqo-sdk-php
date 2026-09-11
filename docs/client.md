@@ -37,9 +37,8 @@ resources. No network request is made.
 
 **Throws** `Suqo\Exception\SuqoConfigError` — a missing or malformed key, an
 `environment` that disagrees with the key prefix, an unparseable `environment` or
-`logLevel` string, `timeout <= 0`, or `maxRetries < 0`. It extends
-`\InvalidArgumentException`, **not** `SuqoError`, so a `catch (SuqoError)` will not
-catch it.
+`logLevel` string, `timeout <= 0`, or `maxRetries < 0`. It extends `SuqoError`,
+so a `catch (SuqoError)` does catch it.
 
 ```php
 $suqo = new SuqoClient(

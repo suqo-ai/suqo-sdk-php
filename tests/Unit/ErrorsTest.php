@@ -13,6 +13,7 @@ use Suqo\Exception\KycRequiredError;
 use Suqo\Exception\NetworkError;
 use Suqo\Exception\NotFoundError;
 use Suqo\Exception\NotImplementedError;
+use Suqo\Exception\PermissionDeniedError;
 use Suqo\Exception\RateLimitError;
 use Suqo\Exception\ServerError;
 use Suqo\Exception\SuqoError;
@@ -54,12 +55,15 @@ final class ErrorsTest extends TestCase
         self::assertSame('KYC required', $error->getMessage());
     }
 
-    public function testE4NonKycBodyOn403IsABareSuqoError(): void
+    public function testE4NonKycBodyOn403IsAPermissionDeniedError(): void
     {
+        // openapi documents every 403 as a plain authorization failure; the KYC
+        // body shape is the narrower case, checked first. The server's `detail`
+        // is the message, not discarded.
         $error = ErrorMapper::map(403, ['detail' => 'forbidden'], 'req_1');
 
-        self::assertSame(SuqoError::class, $error::class);
-        self::assertSame('Unexpected status 403.', $error->getMessage());
+        self::assertSame(PermissionDeniedError::class, $error::class);
+        self::assertSame('forbidden', $error->getMessage());
     }
 
     public function testE5FieldErrorsMapEveryKeyToAList(): void
@@ -117,12 +121,13 @@ final class ErrorsTest extends TestCase
         self::assertSame('Server error (503).', $error->getMessage());
     }
 
-    public function testE10UnmappedStatusIsABareSuqoError(): void
+    public function testE10UnmappedStatusIsAServerError(): void
     {
+        // Matches the TypeScript binding, whose `default` arm is ServerError.
         $error = ErrorMapper::map(418, null, 'req_1');
 
-        self::assertSame(SuqoError::class, $error::class);
-        self::assertSame('Unexpected status 418.', $error->getMessage());
+        self::assertSame(ServerError::class, $error::class);
+        self::assertSame('Request failed with status 418.', $error->getMessage());
     }
 
     public function testE11RawBodyPreservesWireNames(): void
@@ -209,14 +214,49 @@ final class ErrorsTest extends TestCase
     {
         $error = ErrorMapper::map(403, ['status_code' => 403, 'message' => 'nope'], 'req_1');
 
-        self::assertSame(SuqoError::class, $error::class);
-        self::assertSame('Unexpected status 403.', $error->getMessage());
+        // `status_code` is an int, so this is not a KYC body: it falls through
+        // to the plain authorization error, whose message comes from the body.
+        self::assertSame(PermissionDeniedError::class, $error::class);
+        self::assertSame('nope', $error->getMessage());
     }
 
     public function testNonObjectBodyClassifiesAsNone(): void
     {
         self::assertSame('Not found.', ErrorMapper::map(404, 'plain text', 'req_1')->getMessage());
-        self::assertSame('Not found.', ErrorMapper::map(404, ['a', 'b'], 'req_1')->getMessage());
+        self::assertSame('Not found.', ErrorMapper::map(404, 42, 'req_1')->getMessage());
+    }
+
+    /**
+     * `subscriptions.cancel` and `.resume` answer an illegal state transition
+     * with a bare list of strings rather than the field-keyed object every other
+     * 400 uses. The first entry is the message; it is not a field error.
+     */
+    public function testStringListBodyBecomesTheMessage(): void
+    {
+        $error = ErrorMapper::map(400, ['Cannot cancel subscription while it is cancelled.'], 'req_1');
+
+        self::assertInstanceOf(ValidationError::class, $error);
+        self::assertSame('Cannot cancel subscription while it is cancelled.', $error->getMessage());
+        self::assertSame([], $error->fieldErrors);
+    }
+
+    /**
+     * A nested error object contributes a dotted path, matching the TypeScript
+     * binding. The top-level `client` key is renamed to `customer` because
+     * `fieldErrors` is SDK surface; `rawBody` keeps the wire spelling (E11).
+     */
+    public function testNestedFieldErrorsBecomeDottedPaths(): void
+    {
+        $error = ErrorMapper::map(
+            400,
+            ['client' => ['billing' => ['billing_email' => ['Enter a valid email address.']]]],
+            'req_1',
+        );
+
+        self::assertSame(
+            ['customer.billing.billing_email' => ['Enter a valid email address.']],
+            $error->fieldErrors,
+        );
     }
 
     public function testFieldErrorMessageFollowsJsonDocumentOrder(): void

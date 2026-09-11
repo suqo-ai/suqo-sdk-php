@@ -1,24 +1,23 @@
 # Errors
 
-Every failure raised after construction derives from `Suqo\Exception\SuqoError`,
-which extends `\RuntimeException`. Construction itself raises `SuqoConfigError`,
-which does **not**.
+Every failure the SDK raises derives from `Suqo\Exception\SuqoError`, which
+extends `\RuntimeException`. A single `catch (SuqoError)` is total — configuration
+faults included.
 
 ```
 \RuntimeException
-└── SuqoError                 base type; also raised for unmapped statuses
+└── SuqoError                 the base type
     ├── AuthenticationError   401
     ├── KycRequiredError      403 with a KYC-shaped body
+    ├── PermissionDeniedError 403 without one
     ├── ValidationError       400
     ├── NotFoundError         404
     ├── RateLimitError        429
-    ├── ServerError           >= 500
-    ├── NetworkError          transport failure or timeout (status 0)
+    ├── ServerError           >= 500, and any status not mapped above
+    ├── NetworkError          transport failure, timeout, refused URL (status 0)
     ├── CancelledError        caller cancelled (status 0)
-    └── NotImplementedError   unimplemented resource (status 0)
-
-\InvalidArgumentException
-└── SuqoConfigError           bad configuration, before any request exists
+    ├── NotImplementedError   unimplemented resource (status 0)
+    └── SuqoConfigError       bad configuration, before any request exists
 ```
 
 The `Error` suffix is kept rather than PHP's `Exception` idiom so type names read
@@ -106,9 +105,18 @@ The wire field `status_code`, surfaced as `kycStatus` because it sits next to th
 HTTP status and means something else entirely. The raw body still carries
 `status_code`. Its constructor defaults `$status` to `403`.
 
-A 403 whose body is *not* KYC-shaped yields a bare `SuqoError` with the message
-`'Unexpected status 403.'` — worth knowing when you are catching `KycRequiredError`
-and seeing nothing.
+A 403 whose body is *not* KYC-shaped yields `PermissionDeniedError` instead — see
+below. Catch both if you want to handle every 403.
+
+### `PermissionDeniedError` — 403 without a KYC-shaped body
+
+openapi documents every 403 as a plain authorization failure
+(`{"detail": "You are not authorized to access this resource."}`): the key is
+valid, but this account may not use this endpoint. The body's `detail` becomes
+the message, falling back to that sentence when there is no body.
+
+KYC is the narrower case and is checked first, so a genuine KYC response still
+raises `KycRequiredError`.
 
 ### `NotFoundError` — 404
 
@@ -121,10 +129,16 @@ Retried automatically on a `GET` (up to `maxRetries`), and `retryAfter` is honou
 by the retry policy, capped at 60 s. If it still surfaces, you have exhausted the
 retries; back off using `$e->retryAfter` when it is non-null.
 
-### `ServerError` — 5xx
+### `ServerError` — 5xx, and anything unmapped
 
-Retried automatically on a `GET`. `getMessage()` is `'Server error (%d).'` with the
+Retried automatically on a `GET` when the status is 5xx. `getMessage()` prefers
+the body's `detail` or `message`, falling back to `'Server error (%d).'` with the
 actual status, so the status is in the log line even without reading `$e->status`.
+
+A status the table above does not name — a `402`, say — also lands here, with the
+message `'Request failed with status %d.'`. That mirrors the TypeScript SDK's
+`default` arm, so the two bindings classify an unexpected status identically.
+Such a status is **not** retried: only a network failure, a 429 or a 5xx is.
 
 ### `NetworkError` — status 0
 
@@ -146,16 +160,23 @@ Raised by every `$suqo->customers` method. See [customers.md](customers.md).
 ### `SuqoConfigError`
 
 ```php
-final class SuqoConfigError extends \InvalidArgumentException
+final class SuqoConfigError extends SuqoError
 ```
 
 Raised from `new SuqoClient(...)` or `Config::resolve(...)` — a missing or malformed
 key, an `environment` disagreeing with the key prefix, an unparseable `environment`
 or `logLevel`, a non-positive `timeout`, a negative `maxRetries`.
 
-It sits outside the `SuqoError` tree on purpose: it is a programming or deployment
-mistake, not an API outcome, and there is no `status` or `requestId` to report
-because no request exists.
+It sits **inside** the `SuqoError` tree so that one `catch (SuqoError)` covers
+everything the SDK can raise, matching the TypeScript binding. `status` is `0`,
+`requestId` is `''` and `rawBody` is `null`, because no request exists — it is a
+programming or deployment mistake rather than an API outcome.
+
+An earlier revision extended `\InvalidArgumentException`, which is the more
+literal PHP idiom for a construction-time argument fault but split the hierarchy
+and surprised callers who had written the obvious catch-all. If you were catching
+`\InvalidArgumentException` around client construction, catch `SuqoConfigError`
+(or `SuqoError`) instead.
 
 ```php
 use Suqo\Exception\SuqoConfigError;
