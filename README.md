@@ -47,16 +47,26 @@ echo $page->count;                        // total across all pages
 
 foreach ($page->results as $product) {
     echo $product->productId, ' ', $product->name, PHP_EOL;
-    echo '  vat ', $product->vat, ' subscribers ', $product->totalSubscribers, PHP_EOL;
+    echo '  vat ', $product->vat?->vatPercentage ?? 'n/a',
+         ' subscribers ', $product->totalSubscribers, PHP_EOL;
 
     foreach ($product->plan as $plan) {
         echo '  plan ', $plan->planId, ' ', $plan->planName, PHP_EOL;
+
+        foreach ($plan->billingPeriods as $period) {
+            // pbpId is what subscriptions->create() needs.
+            echo '    ', $period->pbpId, ' ', $period->label,
+                 ' ', $period->price, ' ', $period->currency, PHP_EOL;
+        }
     }
 }
 ```
 
-Price is not on the product record — it lives on the plan billing point, and
-surfaces as `$subscription->product->price` once a subscription exists.
+Price is not on the product record — it lives on the plan billing point
+(`$plan->billingPeriods[…]->price`), and surfaces again as
+`$subscription->product->price` once a subscription exists. `vat` is an object
+(`ProductVat`) whose members are null when VAT is switched off, and
+`productImage` is a `list<ProductImage>`.
 
 Auto-paging is lazy — a page is fetched only when you exhaust the previous one:
 
@@ -99,12 +109,16 @@ $created = $suqo->subscriptions->create(new CreateSubscriptionParams(
     returnUrl: 'https://merchant.example.com/thanks',
 ));
 
-echo $created->pbpId, ' ', $created->returnUrl;
+// Send the buyer here to pay. The return is not proof of payment — the real
+// outcome arrives on the checkout.succeeded / checkout.failed webhooks.
+echo $created->checkoutUrl, PHP_EOL;
+echo $created->subscriptionId, ' ', $created->status?->value, PHP_EOL;
 ```
 
-The API declares the 201 body as the same schema as the request, so the response
-echoes what was sent. Anything the server adds beyond that — a checkout URL, say —
-is reachable through `$created->toArray()` without an SDK upgrade.
+The 201 body is its own schema, not an echo of the request: `subscriptionId`,
+`pbpId`, `status`, `checkoutUrl`, `nextBillingCycle`, `createdAt`. Neither
+`return_url` nor `client` comes back. Anything the server adds beyond that is
+still reachable through `$created->toArray()` without an SDK upgrade.
 
 The SDK says `customer`; the wire says `client`. The rename is applied in both
 directions at the serialisation boundary, and raw error bodies always keep the wire
@@ -154,9 +168,13 @@ if ($status instanceof SubscriptionStatus) {
 
 ## Money is a string
 
-Every monetary and decimal value — `price`, `vat`, `totalSubscribers` — is a
-`string`, end to end, and is never parsed into a float inside the SDK. Dates are
-strings for the same reason. Parse at your own boundary if you need arithmetic:
+Every monetary and decimal value — `price`, `vatPercentage`, `totalSubscribers`
+— is a `string`, end to end, and is never parsed into a float inside the SDK.
+`vat_percentage` arrives as a JSON *number* and is still surfaced as a string,
+without ever being cast through a float type. Dates are strings for the same
+reason, and they carry microseconds and a `+05:45` offset rather than `Z`.
+
+Parse at your own boundary if you need arithmetic:
 
 ```php
 $total = bcmul($subscription->product->price, '2', 2);
@@ -194,17 +212,19 @@ try {
 | --- | --- |
 | `AuthenticationError` | 401 |
 | `KycRequiredError` | 403 with a KYC-shaped body |
+| `PermissionDeniedError` | 403 without one — a plain authorization failure |
 | `ValidationError` | 400 |
 | `NotFoundError` | 404 |
 | `RateLimitError` | 429 |
-| `ServerError` | ≥ 500 |
-| `NetworkError` | transport failure or timeout (status 0) |
+| `ServerError` | ≥ 500, and any status not mapped above |
+| `NetworkError` | transport failure, timeout, or a refused URL (status 0) |
 | `CancelledError` | caller cancelled (status 0) |
-| `NotImplementedError` | unimplemented resource (status 0) |
-| `SuqoError` | base type; also unmapped statuses |
+| `NotImplementedError` | a resource exposed ahead of its operations (status 0) — currently unused |
+| `SuqoError` | the base type every one of the above derives from |
 
-`SuqoConfigError extends \InvalidArgumentException` and is raised during
-construction, before any request exists.
+`SuqoConfigError extends SuqoError` and is raised during construction, before any
+request exists, so it carries no status, request id or body. A single
+`catch (SuqoError)` is therefore total across the SDK.
 
 ## Retries
 
@@ -282,23 +302,42 @@ $suqo = new SuqoClient(httpClient: new Psr18HttpClient($client, $requestFactory,
 Or implement `Suqo\Http\HttpClientInterface` yourself — one method, and the
 transport handles everything else.
 
+## Customers
+
+*Full reference: [docs/customers.md](docs/customers.md).*
+
+Read-only — a customer record is created implicitly the first time someone
+subscribes, through `subscriptions->create()`'s `customer` field.
+
+```php
+foreach ($suqo->customers->autoPaging() as $customer) {
+    echo $customer->id, ' ', $customer->buyerPhone, ' ', $customer->fullName ?? '-', PHP_EOL;
+}
+
+$customer = $suqo->customers->read('cus_0390b1820');
+```
+
+`id` is a prefixed public id (`cus_0390b1820`) — not an integer and not a UUID,
+unlike the subscription ids elsewhere in the API. Every field except `id`,
+`buyerPhone` and `createdAt` can be `null`.
+
 ## Not yet exposed
 
-openapi.yaml declares four operations this SDK deliberately does not expose,
-because §14 of the specification forbids public surface the specification itself
-does not describe. Each needs a specification revision first:
+openapi declares these operations, which this SDK does not expose. Each needs a
+specification revision first, because §14 forbids public surface the
+specification itself does not describe:
 
 | openapi operationId | Path |
 | --- | --- |
 | `subscriptions_read` | `GET /api/v1/subscriptions/{id}/` |
 | `subscriptions_resume` | `POST /api/v1/subscriptions/{id}/resume/` |
-| `customers_list` | `GET /api/v1/customers/` |
-| `customers_read` | `GET /api/v1/customers/{id}/` |
+| `customers_create` | `POST /api/v1/customers/` |
+| `customers_partial_update` | `PATCH /api/v1/customers/{id}/` |
+| `webhooks_*` | the eight `/api/v1/webhooks/…` operations |
 
-`$suqo->customers` exists and raises `NotImplementedError` (§10.3) so the shape of
-the client stays stable across the version that implements it. The record type
-`Suqo\Model\Customer` is already un-stubbed, since §9.4 ties that to openapi.yaml
-rather than to §10.3.
+The Webhooks *management* resource is unexposed; `Suqo\Webhook::verify()` — which
+verifies an inbound delivery and needs no network — is unrelated to it and is
+fully supported.
 
 ## Playground
 

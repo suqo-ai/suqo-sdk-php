@@ -264,9 +264,9 @@ switch ($route) {
     case 'GET /customers':
         // §10.3 — the resource exists, every operation refuses. Shown so the
         // behaviour is visible rather than surprising.
-        [, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->customers->list());
+        [$page, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->customers->list());
 
-        view('customers', ['error' => $error]);
+        view('customers', ['page' => $page, 'error' => $error]);
 
         // no break — view() exits.
 

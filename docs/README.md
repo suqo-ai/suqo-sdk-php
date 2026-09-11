@@ -14,7 +14,7 @@ Everything is namespaced under `Suqo\`, PSR-4 from `src/`.
 | [client.md](client.md) | `SuqoClient`, `Config`, `Environment`, `LogLevel` |
 | [products.md](products.md) | `Resource\Products` |
 | [subscriptions.md](subscriptions.md) | `Resource\Subscriptions` |
-| [customers.md](customers.md) | `Resource\Customers` — reserved, raises `NotImplementedError` |
+| [customers.md](customers.md) | `Resource\Customers` — `list`, `autoPaging`, `read` (read-only) |
 | [webhooks.md](webhooks.md) | `Webhook::verify`, `SuqoClient::verifyWebhook` |
 | [errors.md](errors.md) | the exception hierarchy, error fields, `ErrorMapper` |
 | [models.md](models.md) | response models, params objects, `SubscriptionStatus` |
@@ -35,9 +35,9 @@ Everything callable, in one table.
 | `$suqo->subscriptions->create(…)` | `CreateSubscriptionResponse` | [subscriptions](subscriptions.md#create) |
 | `$suqo->subscriptions->cancel(…)` | `MessageResponse` | [subscriptions](subscriptions.md#cancel) |
 | `$suqo->subscriptions->updateBillingCycle(…)` | `MessageResponse` | [subscriptions](subscriptions.md#updatebillingcycle) |
-| `$suqo->customers->list(…)` | *throws* `NotImplementedError` | [customers](customers.md#list) |
-| `$suqo->customers->autoPaging(…)` | *throws* `NotImplementedError` | [customers](customers.md#autopaging) |
-| `$suqo->customers->read(…)` | *throws* `NotImplementedError` | [customers](customers.md#read) |
+| `$suqo->customers->list(…)` | `Page<Customer>` | [customers](customers.md#list) |
+| `$suqo->customers->autoPaging(…)` | `Generator<int, Customer>` | [customers](customers.md#autopaging) |
+| `$suqo->customers->read(…)` | `Customer` | [customers](customers.md#read) |
 | `Webhook::verify(…)` | `bool` | [webhooks](webhooks.md#verify) |
 | `Config::resolve(…)` | `Config` | [client](client.md#configresolve) |
 | `Environment::baseUrl()` | `string` | [client](client.md#environmentbaseurl) |

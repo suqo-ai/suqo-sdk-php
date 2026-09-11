@@ -32,7 +32,7 @@ Stop it with Ctrl-C. Pick a different port by editing the command, not the code.
 | **Products** (`/products`) | `products->list()` page by page, and `products->autoPaging()` walking every page lazily |
 | **Subscriptions** (`/subscriptions`) | `subscriptions->list()`, `cancel()`, `updateBillingCycle()`; status counts; the `client` → `customer` rename |
 | **Create** (`/subscriptions/new`) | `subscriptions->create()`, showing the exact request body that went out |
-| **Customers** (`/customers`) | `customers->list()` raising `NotImplementedError` (§10.3), plus a decoded `Customer` record |
+| **Customers** (`/customers`) | `customers->list()` — the read-only customer records, with nulls shown as nulls |
 | **Webhooks** (`/webhook`) | `Webhook::verify()` — no client, no key, no network. "Sign it for me" produces a valid signature so the page is demonstrable without a real delivery |
 
 Errors are rendered rather than thrown: type, HTTP status, request id, field errors,
