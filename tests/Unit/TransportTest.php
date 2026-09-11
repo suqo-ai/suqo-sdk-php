@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Suqo\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Suqo\Cancellation;
 use Suqo\Endpoints;
 use Suqo\Exception\CancelledError;
@@ -184,5 +185,83 @@ final class TransportTest extends TransportTestCase
         $this->transport($client, timeout: 1.5)->request('GET', Endpoints::PRODUCTS);
 
         self::assertSame(1.5, $client->lastRequest()->timeout);
+    }
+
+    /**
+     * §6.6 — an absolute URL may only address the configured origin.
+     *
+     * Every request carries the API key, and getAbsolute() is the only entry
+     * point that accepts a URL the SDK did not build, so a `next` link pointing
+     * off host would hand the key to that host.
+     */
+    public function testAbsoluteUrlOnTheConfiguredOriginIsFollowed(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, ['count' => 0, 'results' => []]);
+
+        $this->transport($client)->getAbsolute('https://test-be.suqo.ai/api/v1/products/?page=2');
+
+        self::assertSame(1, $client->attempts());
+    }
+
+    public function testAbsoluteUrlHostIsComparedCaseInsensitively(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, []);
+
+        $this->transport($client)->getAbsolute('https://TEST-BE.SUQO.AI/api/v1/products/');
+
+        self::assertSame(1, $client->attempts());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function offOriginUrls(): array
+    {
+        return [
+            'different host' => ['https://api.suqo.ai/api/v1/products/?page=2'],
+            'live host from a sandbox client' => ['https://be.suqo.ai/api/v1/products/?page=2'],
+            'attacker host' => ['https://evil.example.com/api/v1/products/?page=2'],
+            'subdomain prefix' => ['https://test-be.suqo.ai.evil.example.com/api/v1/products/'],
+            'downgraded scheme' => ['http://test-be.suqo.ai/api/v1/products/'],
+            'explicit port' => ['https://test-be.suqo.ai:8443/api/v1/products/'],
+            'scheme-relative' => ['//evil.example.com/api/v1/products/'],
+            'not a url' => ['nonsense'],
+            'empty' => [''],
+        ];
+    }
+
+    #[DataProvider('offOriginUrls')]
+    public function testAbsoluteUrlOffTheConfiguredOriginIsRefused(string $url): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, []);
+
+        try {
+            $this->transport($client)->getAbsolute($url);
+            self::fail('Expected the off-origin URL to be refused.');
+        } catch (NetworkError $e) {
+            self::assertStringContainsString('does not match the configured', $e->getMessage());
+            self::assertSame(0, $e->status);
+        }
+
+        // Refused before the request is made, not after: nothing was sent, so
+        // the API key never reached the other host.
+        self::assertSame(0, $client->attempts());
+    }
+
+    /**
+     * The check precedes the retry loop — a refused URL cannot succeed on a
+     * second attempt, so it must not consume retries or sleep.
+     */
+    public function testARefusedUrlIsNotRetried(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, []);
+
+        try {
+            $this->transport($client, maxRetries: 2)->getAbsolute('https://evil.example.com/x/');
+        } catch (NetworkError) {
+            // expected
+        }
+
+        self::assertSame(0, $client->attempts());
     }
 }
