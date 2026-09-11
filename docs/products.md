@@ -44,7 +44,8 @@ echo $page->count, PHP_EOL;               // total across all pages
 
 foreach ($page->results as $product) {
     echo $product->productId, ' ', $product->name, PHP_EOL;
-    echo '  vat ', $product->vat, ' subscribers ', $product->totalSubscribers, PHP_EOL;
+    echo '  vat ', $product->vat?->vatPercentage ?? 'n/a',
+         ' subscribers ', $product->totalSubscribers, PHP_EOL;
 
     foreach ($product->plan as $plan) {
         echo '  plan ', $plan->planId, ' ', $plan->planName, PHP_EOL;
@@ -105,14 +106,29 @@ of an unexpected type reads as absent rather than failing the whole response.
 | `isActive` | `?bool` | `is_active` |
 | `termsAndConditions` | `?string` | `terms_and_conditions` |
 | `featuresAndBenefits` | `?string` | `features_and_benefits` |
-| `vat` | `?string` | `vat` — a decimal, kept as a string |
-| `productImage` | `?string` | `product_image` |
+| `vat` | `?ProductVat` | `vat` — an object; null only when the key is absent |
+| `productImage` | `list<ProductImage>` | `product_image` |
 | `plan` | `list<ProductPlan>` | `plan` |
 | `totalSubscribers` | `?string` | `total_subscribers` — a decimal string |
 | `createdAt` | `?string` | `created_at` |
 | `updatedAt` | `?string` | `updated_at` |
 
-`ProductPlan`: `planId`, `planName`, `description`, `billingPeriods` — all
+`ProductVat`: `isVatActive` (`?bool`), `vatType` (`?string`, `inclusive` or
+`exclusive`), `vatPercentage` (`?string`). All three are null when VAT is off,
+which is the common case; the object itself is still present.
+
+`ProductImage`: `image` (`?string`), `imageOrder` (`?int`).
+
+`BillingPeriod`: `pbpId`, `intervalType`, `intervalCount` (`?int`), `label`,
+`price`, `currency`, `isCurrent` / `isLimited` / `isArchived` (`?bool`),
+`offers` (`list<Offer>`). **`pbpId` is the required input to
+`subscriptions->create()`** — this is where you get it.
+
+`Offer`: `id`, `discountAmount` (`?int`), `startsAt`, `validUntil`, `isActive`
+(`?bool`).
+
+`ProductPlan`: `planId`, `planName`, `description`, `billingPeriods`
+(`list<BillingPeriod>`) — the scalars all
 `?string`, all snake_case on the wire.
 
 Anything the server adds beyond this list is still reachable:

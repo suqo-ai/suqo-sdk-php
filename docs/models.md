@@ -111,15 +111,19 @@ properties and `toArray()`.
 
 | Model | Properties |
 | --- | --- |
-| `Product` | `productId`, `name`, `description`, `type`, `isActive` (`?bool`), `termsAndConditions`, `featuresAndBenefits`, `vat`, `productImage`, `plan` (`list<ProductPlan>`), `totalSubscribers`, `createdAt`, `updatedAt` |
-| `ProductPlan` | `planId`, `planName`, `description`, `billingPeriods` |
+| `Product` | `productId`, `name`, `description`, `type`, `isActive` (`?bool`), `termsAndConditions`, `featuresAndBenefits`, `vat` (`?ProductVat`), `productImage` (`list<ProductImage>`), `plan` (`list<ProductPlan>`), `totalSubscribers`, `createdAt`, `updatedAt` |
+| `ProductVat` | `isVatActive` (`?bool`), `vatType`, `vatPercentage` |
+| `ProductImage` | `image`, `imageOrder` (`?int`) |
+| `ProductPlan` | `planId`, `planName`, `description`, `billingPeriods` (`list<BillingPeriod>`) |
+| `BillingPeriod` | `pbpId`, `intervalType`, `intervalCount` (`?int`), `label`, `price`, `currency`, `isCurrent` / `isLimited` / `isArchived` (`?bool`), `offers` (`list<Offer>`) |
+| `Offer` | `id`, `discountAmount` (`?int`), `startsAt`, `validUntil`, `isActive` (`?bool`) |
 | `Subscription` | `subscriptionId`, `status` (`SubscriptionStatus\|string\|null`), `isActive` (`?bool`), `customer` (`?SubscriptionCustomer`, wire `client`), `product` (`?SubscriptionProduct`), `currentPeriodStart`, `currentPeriodEnd`, `nextBillingCycle`, `createdAt` |
 | `SubscriptionCustomer` | `phone`, `fullName`, `email`, `address`, `billing`, `shipping` |
 | `SubscriptionCustomerBilling` | `businessName`, `email`, `address`, `panVat` |
 | `SubscriptionCustomerShipping` | `phone`, `fullName`, `email`, `address` |
 | `SubscriptionProduct` | `productId`, `name`, `planName`, `pbpId`, `label`, `price`, `currency` |
 | `Customer` | `id` (`?int`), `buyerPhone`, `buyerEmail`, `fullName`, `createdAt` |
-| `CreateSubscriptionResponse` | `pbpId`, `returnUrl`, `customer` (`?Params\CustomerInput`, wire `client`) |
+| `CreateSubscriptionResponse` | `subscriptionId`, `pbpId`, `status` (`SubscriptionStatus\|string\|null`), `checkoutUrl`, `nextBillingCycle`, `createdAt` |
 | `MessageResponse` | `message` (`string`, non-null, `''` when absent) |
 
 Unless noted, every property is `?string`, and every wire key is the snake_case form
@@ -147,7 +151,7 @@ So you send `billingEmail` and read back `email`. Same for address and PAN/VAT.
 
 ### Decimals and dates are strings
 
-`price`, `vat`, `totalSubscribers` and every timestamp or date are `string`, end to
+`price`, `vatPercentage`, `totalSubscribers` and every timestamp or date are `string`, end to
 end, and are never parsed into a float inside the SDK. Parse at your own boundary:
 
 ```php

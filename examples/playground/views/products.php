@@ -56,11 +56,20 @@ declare(strict_types=1);
                     <td><?= e($product->name) ?></td>
                     <td><?= e($product->type) ?></td>
                     <td><?= $product->isActive === null ? '—' : ($product->isActive ? 'yes' : 'no') ?></td>
-                    <td class="num"><?= e($product->vat) ?></td>
+                    <td class="num"><?= $product->vat?->isVatActive === true
+                        ? e(($product->vat->vatPercentage ?? '?') . '%')
+                        : '<span class="muted">none</span>' ?></td>
                     <td class="num"><?= e($product->totalSubscribers) ?></td>
                     <td>
                         <?php foreach ($product->plan as $plan) { ?>
                             <div><code><?= e($plan->planId) ?></code> <?= e($plan->planName) ?></div>
+                            <?php foreach ($plan->billingPeriods as $period) { ?>
+                                <div class="muted" style="padding-left:12px">
+                                    <code><?= e($period->pbpId) ?></code>
+                                    <?= e($period->label) ?>
+                                    <?= e($period->price) ?> <?= e($period->currency) ?>
+                                </div>
+                            <?php } ?>
                         <?php } ?>
                     </td>
                 </tr>
