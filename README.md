@@ -9,7 +9,7 @@ code you can run against your own sandbox, see **[examples/](examples/)**.
 Requires PHP 8.1+ with `ext-curl`, `ext-json` and `ext-hash`.
 
 ```bash
-composer require suqo/suqo-php
+composer require suqo/sdk-php
 ```
 
 ## Quick start

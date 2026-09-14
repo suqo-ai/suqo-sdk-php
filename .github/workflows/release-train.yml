@@ -69,29 +69,18 @@ jobs:
           git config user.email 'github-actions[bot]@users.noreply.github.com'
 
           # Annotated, not lightweight: the tag carries the release message.
-          git tag -a "v${VERSION}" -m "suqo/suqo-php v${VERSION}"
+          git tag -a "v${VERSION}" -m "suqo/sdk-php v${VERSION}"
           git push origin "v${VERSION}"
 
           php tools/release.php notes "${VERSION}" > /tmp/notes.md
           gh release create "v${VERSION}" --title "v${VERSION}" --notes-file /tmp/notes.md
 
-      - name: Notify Packagist
-        # Done here, not in release.yml: a tag pushed with the built-in
-        # GITHUB_TOKEN does not trigger other workflows, so release.yml's
-        # `on: push: tags` would never fire for a release cut by the train.
-        if: steps.mode.outputs.mode == 'publish'
-        env:
-          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
-          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
-        run: |
-          if [ -z "${PACKAGIST_USERNAME}" ] || [ -z "${PACKAGIST_TOKEN}" ]; then
-            echo "::warning::Packagist secrets not set; v${{ steps.mode.outputs.version }} is tagged but Packagist was not told."
-            exit 0
-          fi
-          curl -sS --fail-with-body -X POST \
-            -H 'content-type:application/json' \
-            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}" \
-            -d '{"repository":{"url":"https://github.com/Code-Pros-AI/sdk-php"}}'
+          # Packagist is not called from here. The Packagist GitHub App is
+          # subscribed to this repository's push events, and a tag push is a
+          # push event whoever made it -- the GITHUB_TOKEN restriction that
+          # stops a bot-pushed tag triggering *workflows* does not apply to
+          # outbound webhooks. Calling the API as well would mean keeping an
+          # API token in CI secrets for no added coverage.
 
       # ---------------------------------------------------------------- prepare
 

@@ -1,65 +1,65 @@
 {
-    "name": "suqo/suqo-php",
-    "description": "Official PHP SDK for the SUQO API.",
-    "type": "library",
-    "license": "MIT",
-    "keywords": [
-        "suqo",
-        "sdk",
-        "api",
-        "subscriptions",
-        "payments"
-    ],
-    "homepage": "https://suqo.ai",
-    "require": {
-        "php": "^8.1",
-        "ext-curl": "*",
-        "ext-json": "*",
-        "ext-hash": "*"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0",
-        "phpstan/phpstan": "^1.11 || ^2.0",
-        "friendsofphp/php-cs-fixer": "^3.58",
-        "psr/http-client": "^1.0",
-        "psr/http-factory": "^1.0",
-        "nyholm/psr7": "^1.8"
-    },
-    "autoload": {
-        "psr-4": {
-            "Suqo\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Suqo\\Tests\\": "tests/"
-        }
-    },
-    "scripts": {
-        "test": "phpunit",
-        "stan": "phpstan analyse --memory-limit=1G",
-        "fmt": "php-cs-fixer fix",
-        "lint": "php-cs-fixer fix --dry-run --diff",
-        "invariants": "bash tools/check-invariants.sh",
-        "ci": [
-            "@lint",
-            "@stan",
-            "@invariants",
-            "@test"
-        ],
-        "playground": [
-            "Composer\\Config::disable-process-timeout",
-            "php -S 127.0.0.1:8000 -t examples/playground examples/playground/index.php"
-        ]
-    },
-    "config": {
-        "sort-packages": true,
-        "allow-plugins": {}
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true,
-    "suggest": {
-        "psr/http-client": "Inject any PSR-18 HTTP client via Suqo\\Http\\Psr18HttpClient.",
-        "psr/http-factory": "Required alongside psr/http-client when using Suqo\\Http\\Psr18HttpClient."
+  "name": "suqo/sdk-php",
+  "description": "Official PHP SDK for the SUQO API.",
+  "type": "library",
+  "license": "MIT",
+  "keywords": [
+    "suqo",
+    "sdk",
+    "api",
+    "subscriptions",
+    "payments"
+  ],
+  "homepage": "https://suqo.ai",
+  "require": {
+    "php": "^8.1",
+    "ext-curl": "*",
+    "ext-json": "*",
+    "ext-hash": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0",
+    "phpstan/phpstan": "^1.11 || ^2.0",
+    "friendsofphp/php-cs-fixer": "^3.58",
+    "psr/http-client": "^1.0",
+    "psr/http-factory": "^1.0",
+    "nyholm/psr7": "^1.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "Suqo\\": "src/"
     }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Suqo\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "stan": "phpstan analyse --memory-limit=1G",
+    "fmt": "php-cs-fixer fix",
+    "lint": "php-cs-fixer fix --dry-run --diff",
+    "invariants": "bash tools/check-invariants.sh",
+    "ci": [
+      "@lint",
+      "@stan",
+      "@invariants",
+      "@test"
+    ],
+    "playground": [
+      "Composer\\Config::disable-process-timeout",
+      "php -S 127.0.0.1:8000 -t examples/playground examples/playground/index.php"
+    ]
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {}
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true,
+  "suggest": {
+    "psr/http-client": "Inject any PSR-18 HTTP client via Suqo\\Http\\Psr18HttpClient.",
+    "psr/http-factory": "Required alongside psr/http-client when using Suqo\\Http\\Psr18HttpClient."
+  }
 }

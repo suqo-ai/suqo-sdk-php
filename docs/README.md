@@ -1,6 +1,6 @@
 # SUQO PHP SDK — API reference
 
-Per-method reference for `suqo/suqo-php`. The [README](../README.md) is the quick
+Per-method reference for `suqo/sdk-php`. The [README](../README.md) is the quick
 start and explains the cross-cutting rules; this folder documents every public
 method, one entry each.
 

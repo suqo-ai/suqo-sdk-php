@@ -1,4 +1,4 @@
-# Versioning policy — `suqo/suqo-php`
+# Versioning policy — `suqo/sdk-php`
 
 Applies to this package. The policy itself is language-agnostic and is shared
 with every SUQO SDK; the TypeScript binding keeps its own copy at
@@ -73,8 +73,9 @@ string.**
    itself as further PRs land, so at any moment it shows exactly what the next
    release would be.
 3. When you merge the Release PR, the train runs again, sees a version in the
-   CHANGELOG with no matching tag, and cuts the release: annotated tag, GitHub
-   Release with that CHANGELOG section as its body, and a Packagist update.
+   CHANGELOG with no matching tag, and cuts the release: an annotated tag and a
+   GitHub Release with that CHANGELOG section as its body. Packagist picks the
+   tag up on its own — see below.
 
 Merging the Release PR is the release decision. Until you merge it, nothing is
 tagged and nothing is published.
@@ -149,10 +150,21 @@ Note that the train does **not** push commits to `main`; the release commit
 arrives through the PR you merge. Ordinary branch protection is therefore not a
 problem — only required status checks are.
 
-**Packagist is notified by the train,** not by `release.yml`. A tag pushed with
-the built-in token does not trigger other workflows, so `release.yml`'s
-`on: push: tags` never fires for a train release. `release.yml` remains the path
-for a tag pushed by hand from a laptop.
+**Nothing in CI calls Packagist.** Indexing is handled by the Packagist GitHub
+App, which is subscribed to this repository's push events. A tag push is a push
+event whoever made it — the `GITHUB_TOKEN` restriction that stops a bot-pushed
+tag triggering *workflows* does not apply to outbound webhooks — so the App sees
+the train's tags and hand-pushed ones alike. That is why no Packagist API token
+is kept in CI secrets.
+
+The consequence worth knowing: `release.yml`, which runs the gate on a tag push,
+never fires for a train release, because the train's tag comes from the built-in
+token. It is there for a tag pushed by hand from a laptop, so that a tag on a
+commit CI never saw is loud rather than silently published.
+
+If a release ever fails to appear on Packagist, check the App's delivery log
+under the repository's Settings → Integrations before suspecting the train — the
+tag and the GitHub Release will already exist.
 
 ## SDK version ↔ API version compatibility
 

@@ -1,6 +1,6 @@
 # Changelog
 
-Notable changes to `suqo/suqo-php`.
+Notable changes to `suqo/sdk-php`.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this
 project follows [Semantic Versioning](https://semver.org/) as described in
@@ -109,4 +109,5 @@ dated version heading automatically, so add new ones under `## [Unreleased]` and
 leave the rest alone.
 
 [Unreleased]: https://github.com/Code-Pros-AI/sdk-php/commits/main
+[0.1.0]: https://github.com/Code-Pros-AI/sdk-php/releases/tag/v0.1.0
 
