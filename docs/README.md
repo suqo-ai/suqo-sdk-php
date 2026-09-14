@@ -2,8 +2,7 @@
 
 Per-method reference for `suqo/suqo-php`. The [README](../README.md) is the quick
 start and explains the cross-cutting rules; this folder documents every public
-method, one entry each. [BINDING.md](../BINDING.md) records *why* the surface looks
-the way it does (decisions B1–B12) and is linked from here rather than restated.
+method, one entry each.
 
 Everything is namespaced under `Suqo\`, PSR-4 from `src/`.
 
@@ -63,7 +62,7 @@ Everything callable, in one table.
 
 ## Conventions across the whole surface
 
-- **Named arguments.** Every optional parameter is passed by name (B2), so a future
+- **Named arguments.** Every optional parameter is passed by name, so a future
   version can add one without breaking a call site.
 - **Money and decimals are strings.** `price`, `vat`, `totalSubscribers` and every
   date stay `string` end to end and are never parsed into a float inside the SDK.

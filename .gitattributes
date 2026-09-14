@@ -19,7 +19,6 @@
 /phpstan.neon.dist      export-ignore
 /composer.lock          export-ignore
 
-/BINDING.md             export-ignore
 /VERSIONING.md          export-ignore
 
 # Kept in the package: src/, composer.json, README.md, LICENSE, CHANGELOG.md.

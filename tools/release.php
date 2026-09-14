@@ -21,8 +21,13 @@ declare(strict_types=1);
  *
  *   php tools/release.php suggest
  *       Print the bump the commits since the last tag imply, or "none" when
- *       nothing releasable has landed. A `Release-As: X.Y.Z` footer on any of
- *       those commits wins outright and is printed verbatim.
+ *       nothing releasable has landed.
+ *
+ *       An explicit `Release-As: X.Y.Z` wins outright and is printed verbatim.
+ *       It is read from two places: the CHANGELOG's [Unreleased] section, and
+ *       any commit message since the last tag. The CHANGELOG is checked first
+ *       and is the reliable one -- a commit footer does not survive a squash
+ *       merge, which would silently downgrade a release to "none".
  *
  *   php tools/release.php pending
  *       Print the newest version in CHANGELOG that has no matching git tag --
@@ -218,6 +223,21 @@ function shipRow(string $versioning, string $version): string
  */
 function cmdSuggest(): int
 {
+    // An explicit version pinned in the tree. Checked before the commit log
+    // because it survives a squash merge, which rewrites commit messages and
+    // would otherwise drop a `Release-As:` footer on the floor.
+    $changelog = file_get_contents(CHANGELOG);
+
+    if ($changelog !== false) {
+        $unreleased = unreleasedBody($changelog) ?? '';
+
+        if (preg_match('/Release-As:\s*v?(\d+\.\d+\.\d+)/i', $unreleased, $pinned) === 1) {
+            echo $pinned[1], PHP_EOL;
+
+            return 0;
+        }
+    }
+
     $range = latestTag() === null ? 'HEAD' : 'v' . latestTag() . '..HEAD';
 
     exec('git log --no-merges --format=%B ' . escapeshellarg($range), $lines, $status);
@@ -228,8 +248,8 @@ function cmdSuggest(): int
 
     $log = implode("\n", $lines);
 
-    // An explicit footer wins: it is the escape hatch for a break the prefixes
-    // cannot express.
+    // The same directive in a commit footer. Kept as a convenience, but the
+    // CHANGELOG form above is the one to rely on.
     if (preg_match('/^Release-As:\s*v?(\d+\.\d+\.\d+)\s*$/mi', $log, $match) === 1) {
         echo $match[1], PHP_EOL;
 
@@ -241,13 +261,11 @@ function cmdSuggest(): int
     $feature = preg_match('/^feat(\([^)]*\))?!?:/mi', $log) === 1;
     $fix = preg_match('/^(fix|perf|refactor|revert)(\([^)]*\))?!?:/mi', $log) === 1;
 
-    $preMajor = (latestTag() === null) || str_starts_with(latestTag(), '0.');
-
-    // While under 1.0 the minor acts as the major (VERSIONING.md), so a breaking
-    // change bumps the minor rather than going straight to 1.0.0.
+    // Plain SemVer. The 0.x demotion this used to apply -- breaking bumps the
+    // minor while under 1.0 -- is gone along with the pre-1.0 policy it served.
     echo match (true) {
-        $breaking => $preMajor ? 'minor' : 'major',
-        $feature => $preMajor ? 'patch' : 'minor',
+        $breaking => 'major',
+        $feature => 'minor',
         $fix => 'patch',
         default => 'none',
     }, PHP_EOL;

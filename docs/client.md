@@ -159,8 +159,7 @@ public function baseUrl(): string
 ```
 
 `Live` → `https://be.suqo.ai`, `Sandbox` → `https://test-be.suqo.ai`. (The sandbox
-host uses a hyphen, not a dot; recorded as a deviation in
-[BINDING.md](../BINDING.md).)
+host uses a hyphen, not a dot — this is deliberate and matches the live API.)
 
 ```php
 use Suqo\Environment;

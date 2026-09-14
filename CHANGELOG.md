@@ -8,7 +8,22 @@ project follows [Semantic Versioning](https://semver.org/) as described in
 
 ## [Unreleased]
 
-_Nothing yet._
+<!-- Release-As: 1.0.0 -->
+
+### Changed
+
+- **The public surface is now stable.** `1.0.0` is a commitment to hold it:
+  from here, a breaking change requires a major version, and additions — the
+  operations listed under *Not yet exposed* in the README — arrive as minors.
+  Nothing in this release changes behaviour; `0.1.0` and `1.0.0` are the same
+  code plus the documentation change below.
+
+### Removed
+
+- `BINDING.md`, the binding companion document. It recorded internal design
+  rationale rather than anything a consumer needs, and was never part of the
+  published package. The handful of sentences in `README.md` and `docs/` that
+  existed only to point into it have been rewritten to stand alone.
 
 ## [0.1.0] - 2026-09-14
 

@@ -316,7 +316,7 @@ Per attempt it sets:
 | `X-Request-Id` | a fresh UUID v4 — **one per attempt**, so a retry carries a new id |
 | `Content-Type` | `application/json`, only when a body exists |
 
-No `User-Agent` is sent; recorded as a deviation in [BINDING.md](../BINDING.md).
+No `User-Agent` is sent.
 
 A body that fails to parse as JSON becomes `null` rather than an exception, on both
 the success and error paths.

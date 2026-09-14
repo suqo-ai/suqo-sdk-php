@@ -1,7 +1,6 @@
 # SUQO PHP SDK
 
-Official PHP SDK for the [SUQO](https://suqo.ai) API. Implements **SUQO SDK —
-Specification v2.0**; binding decisions are recorded in [BINDING.md](BINDING.md).
+Official PHP SDK for the [SUQO](https://suqo.ai) API.
 
 This page is the quick start. For a per-method reference — every parameter, return
 type and thrown exception — see **[docs/](https://suqo.ai/docs/sdk/php)**. For
@@ -349,12 +348,12 @@ fully supported.
 Four runnable scripts in [examples/](examples/). Each takes the key from
 `$SUQO_API_KEY`, so none of them needs editing:
 
-| Script | What it shows |
-| --- | --- |
-| [list_products.php](examples/list_products.php) | Walks the catalogue and prints each plan's billing periods. **Run this first** — it is where `pbpId` comes from. |
-| [create_subscription.php](examples/create_subscription.php) | Creates a subscription from a `pbpId` and prints the `checkoutUrl` to send the buyer to. |
-| [list_customers.php](examples/list_customers.php) | Auto-pages the customer records, then reads one back by its public id. |
-| [webhook_handler.php](examples/webhook_handler.php) | A complete endpoint: verify the signature against the raw bytes, then acknowledge. |
+| Script                                                      | What it shows                                                                                                    |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [list_products.php](examples/list_products.php)             | Walks the catalogue and prints each plan's billing periods. **Run this first** — it is where `pbpId` comes from. |
+| [create_subscription.php](examples/create_subscription.php) | Creates a subscription from a `pbpId` and prints the `checkoutUrl` to send the buyer to.                         |
+| [list_customers.php](examples/list_customers.php)           | Auto-pages the customer records, then reads one back by its public id.                                           |
+| [webhook_handler.php](examples/webhook_handler.php)         | A complete endpoint: verify the signature against the raw bytes, then acknowledge.                               |
 
 ```bash
 SUQO_API_KEY=su_test_key_… php examples/list_products.php
