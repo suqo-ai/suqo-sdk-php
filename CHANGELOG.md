@@ -8,6 +8,10 @@ project follows [Semantic Versioning](https://semver.org/) as described in
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.1.0] - 2026-09-14
+
 ### Added
 
 - `SuqoClient` — environment inferred from the API key prefix, with
@@ -89,3 +93,4 @@ dated version heading automatically, so add new ones under `## [Unreleased]`
 and leave the rest alone.
 
 [Unreleased]: https://github.com/Code-Pros-AI/sdk-php/commits/main
+
