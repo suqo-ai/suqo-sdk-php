@@ -87,6 +87,13 @@ final class Transport
     {
         $cancellation ??= Cancellation::none();
 
+        // Every request carries the API key, and this is the only entry point
+        // that accepts a URL the SDK did not build. A `next` link pointing off
+        // host — a backend bug, a compromised proxy, tampering — would hand the
+        // key to that host. The check precedes the retry loop because a refused
+        // URL cannot succeed on a second attempt.
+        $this->assertSameOrigin($url);
+
         return $this->retry->execute(
             'GET',
             $cancellation,
@@ -145,7 +152,12 @@ final class Transport
             'elapsed_ms' => $elapsedMs,
         ]);
 
-        if ($response->status >= 400) {
+        // §6.5 — 3xx included. No HTTP client the SDK drives follows redirects
+        // (CurlHttpClient forces CURLOPT_FOLLOWLOCATION off), so a 3xx arrives
+        // here intact and would otherwise be decoded as if it were the payload.
+        // It also surfaces an injected PSR-18 client configured not to follow
+        // them, which is the safe configuration but produces no usable body.
+        if ($response->status >= 300) {
             throw ErrorMapper::map(
                 $response->status,
                 $parsed,
@@ -155,6 +167,52 @@ final class Transport
         }
 
         return new TransportResponse($response->status, $parsed, $response->headers, $requestId);
+    }
+
+    /**
+     * §6.6 — an absolute URL may only address the origin this client is
+     * configured for.
+     *
+     * Equality, not an allowlist of the two known hosts: a client is pinned to
+     * one environment by its key prefix (§4.2), so a sandbox client following a
+     * link to the live host would be wrong even though that host is legitimate
+     * for some other client. The expected origin is derived from the configured
+     * base URL rather than named here, so no URL literal escapes the §6.1
+     * endpoint table (I4).
+     *
+     * Raised as a NetworkError so a caller still only ever sees a SuqoError. No
+     * request id: nothing was sent.
+     *
+     * @throws NetworkError
+     */
+    private function assertSameOrigin(string $url): void
+    {
+        if (self::origin($url) !== self::origin($this->config->baseUrl)) {
+            throw new NetworkError(
+                'Refusing to send a request to a host that does not match the configured '
+                . 'base URL. This SDK never sends its API key to a different host.',
+            );
+        }
+    }
+
+    /**
+     * Scheme, host and explicit port — the comparable part of a URL. Scheme and
+     * host are case-insensitive per RFC 3986, so both are lowercased.
+     *
+     * Null for anything unparseable or missing an origin, which makes the
+     * comparison in {@see self::assertSameOrigin()} fail closed: a malformed
+     * next link is refused rather than handed to the HTTP client.
+     */
+    private static function origin(string $url): ?string
+    {
+        $parts = parse_url($url);
+
+        if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+            return null;
+        }
+
+        return strtolower($parts['scheme']) . '://' . strtolower($parts['host'])
+            . (isset($parts['port']) ? ':' . $parts['port'] : '');
     }
 
     /**

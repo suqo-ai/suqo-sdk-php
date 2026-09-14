@@ -41,9 +41,38 @@ final class DecimalsTest extends TransportTestCase
         self::assertIsString($product->totalSubscribers);
     }
 
-    public function testVatIsSurfacedAsAString(): void
+    public function testVatPercentageIsSurfacedAsAString(): void
     {
-        self::assertSame('13.00', $this->firstProduct(['vat' => '13.00'])->vat);
+        // `vat` is an object, and `vat_percentage` arrives as a JSON *number*
+        // rather than a string — the one decimal in the API that does. It is
+        // still surfaced as a string, never cast through a float type.
+        $vat = $this->firstProduct(['vat' => [
+            'is_vat_active' => true,
+            'vat_type' => 'inclusive',
+            'vat_percentage' => 13.00,
+        ]])->vat;
+
+        self::assertNotNull($vat);
+        self::assertTrue($vat->isVatActive);
+        self::assertSame('inclusive', $vat->vatType);
+        self::assertSame('13', $vat->vatPercentage);
+        self::assertIsString($vat->vatPercentage);
+    }
+
+    public function testVatMembersAreNullWhenVatIsOff(): void
+    {
+        // The common case, confirmed live: the object is present, its members
+        // are null.
+        $vat = $this->firstProduct(['vat' => [
+            'is_vat_active' => false,
+            'vat_type' => null,
+            'vat_percentage' => null,
+        ]])->vat;
+
+        self::assertNotNull($vat);
+        self::assertFalse($vat->isVatActive);
+        self::assertNull($vat->vatType);
+        self::assertNull($vat->vatPercentage);
     }
 
     /**
@@ -138,7 +167,7 @@ final class DecimalsTest extends TransportTestCase
             'name' => 'Pro Plan Bundle',
             'type' => 'simple',
             'is_active' => true,
-            'vat' => '13.00',
+            'vat' => ['is_vat_active' => false, 'vat_type' => null, 'vat_percentage' => null],
             'total_subscribers' => '42',
         ], $overrides);
 

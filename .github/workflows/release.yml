@@ -1,0 +1,75 @@
+name: Release
+
+# Publishing a PHP package is not an upload: Packagist reads composer.json from
+# the pushed tag and indexes it, and Composer then installs a GitHub archive of
+# that tag. So this workflow does not build or push an artifact -- it re-runs the
+# full gate against the tagged commit and then tells Packagist to look.
+#
+# The webhook configured on the repository would do that last step on its own.
+# This exists so that a tag pointing at a commit CI never blessed cannot ship: a
+# tag can be pushed to any commit, including one that never opened a PR.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          # The floor the package claims to support, so the gate runs against
+          # the oldest runtime a consumer may have.
+          php-version: '8.1'
+          extensions: curl, json, hash
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Validate manifest
+        # --strict also fails if a `version` key is ever added to composer.json,
+        # which would become a second source of truth alongside the tag.
+        run: composer validate --strict
+
+      - name: Invariants (§5.1)
+        run: composer invariants
+
+      - name: Lint
+        run: composer lint
+
+      - name: Static analysis
+        run: composer stan
+
+      - name: Conformance suite (§13)
+        run: composer test
+
+      - name: Check the tag is not already released
+        run: |
+          if [ -z "${GITHUB_REF_NAME}" ]; then
+            echo "::error::No tag name"; exit 1
+          fi
+          echo "Releasing ${GITHUB_REF_NAME}"
+
+      - name: Notify Packagist
+        # Secrets required on the repository:
+        #   PACKAGIST_USERNAME  your packagist.org username
+        #   PACKAGIST_TOKEN     packagist.org/profile/ -> Show API token
+        # Without them this step fails loudly rather than silently skipping, so a
+        # missing secret cannot look like a successful release.
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
+        run: |
+          if [ -z "${PACKAGIST_USERNAME}" ] || [ -z "${PACKAGIST_TOKEN}" ]; then
+            echo "::error::PACKAGIST_USERNAME / PACKAGIST_TOKEN are not set."
+            exit 1
+          fi
+          curl -sS --fail-with-body -X POST \
+            -H 'content-type:application/json' \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}" \
+            -d '{"repository":{"url":"https://github.com/Code-Pros-AI/sdk-php"}}'

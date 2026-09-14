@@ -95,14 +95,16 @@ public function create(
 | `params` | `CreateSubscriptionParams` | — | Required. Serialised by `toWire()`; the surface `customer` field is emitted as `client`. |
 | `cancellation` | `?Cancellation` | `null` | |
 
-**Returns** `Suqo\Model\CreateSubscriptionResponse` — `pbpId`, `returnUrl`,
-`customer`. openapi declares the 201 body as the same schema as the request, so the
-response echoes what was sent, and `customer` is the *write* shape
-(`Params\CustomerInput`) read back.
+**Returns** `Suqo\Model\CreateSubscriptionResponse` — `subscriptionId`, `pbpId`,
+`status`, `checkoutUrl`, `nextBillingCycle`, `createdAt`.
+
+The 201 body is its own schema, not an echo of the request: neither `return_url`
+nor `client` comes back. `status` is `pending_checkout` on every documented
+response but is decoded through the §9.3 tolerant rule like any other status.
 
 **Throws** `ValidationError` on 400 (with `fieldErrors` populated),
-`KycRequiredError` on a 403 with a KYC-shaped body, `AuthenticationError` on 401,
-`SuqoError` otherwise. **Not retried** — writes stay unretried pending idempotency
+`KycRequiredError` on a 403 with a KYC-shaped body, `PermissionDeniedError` on a
+403 without one, `AuthenticationError` on 401, `SuqoError` otherwise. **Not retried** — writes stay unretried pending idempotency
 keys, so a `NetworkError` here means the request may or may not have landed.
 
 ```php
@@ -133,14 +135,19 @@ $created = $suqo->subscriptions->create(new CreateSubscriptionParams(
     returnUrl: 'https://merchant.example.com/thanks',
 ));
 
-echo $created->pbpId, ' ', $created->returnUrl, PHP_EOL;
+echo $created->checkoutUrl, PHP_EOL;     // send the buyer here to pay
+echo $created->subscriptionId, ' ', $created->status?->value, PHP_EOL;
 ```
 
-Anything the server adds beyond the declared schema — a checkout URL, say — is
-reachable without an SDK upgrade:
+`checkoutUrl` is the point of the call: redirect the buyer there to collect
+payment. **The return is not proof of payment** — the real outcome arrives on the
+`checkout.succeeded` / `checkout.failed` webhooks.
+
+Anything the server adds beyond the declared schema stays reachable without an
+SDK upgrade:
 
 ```php
-$checkoutUrl = $created->toArray()['checkout_url'] ?? null;
+$extra = $created->toArray()['some_new_field'] ?? null;
 ```
 
 Field-by-field parameter reference:

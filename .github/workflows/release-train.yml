@@ -1,0 +1,178 @@
+name: Release train
+
+# The release train. You never tag by hand.
+#
+#   1. You merge a normal PR into main.
+#   2. This runs and opens (or updates) a single "Release PR" on the branch
+#      release/next, containing only the CHANGELOG and VERSIONING edits for the
+#      next version. It stays open and re-prepares itself as more PRs land.
+#   3. When you merge that Release PR, this runs again, notices a version in
+#      CHANGELOG with no matching tag, and cuts the release: tag, GitHub
+#      Release, Packagist.
+#
+# Which of the two paths runs is decided by `release.php pending`, which asks
+# "is there a prepared version with no tag?" rather than pattern-matching the
+# commit subject. That makes it agnostic to how the Release PR was merged --
+# squash, rebase or merge commit all work.
+on:
+  push:
+    branches: [main]
+
+# Never let two pushes race to tag the same version or fight over release/next.
+concurrency:
+  group: release-train
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The next version is computed from tags, and `suggest` reads the log
+          # since the last tag, so the full history is required.
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: curl, json, hash
+          coverage: none
+
+      - name: Decide which path to take
+        id: mode
+        run: |
+          PENDING="$(php tools/release.php pending)"
+          if [ -n "$PENDING" ]; then
+            echo "mode=publish"        >> "$GITHUB_OUTPUT"
+            echo "version=$PENDING"    >> "$GITHUB_OUTPUT"
+            echo "::notice::Release PR merged. Publishing v$PENDING."
+          else
+            echo "mode=prepare"        >> "$GITHUB_OUTPUT"
+            echo "::notice::Maintaining the Release PR."
+          fi
+
+      # ---------------------------------------------------------------- publish
+
+      - name: Tag and publish
+        if: steps.mode.outputs.mode == 'publish'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.mode.outputs.version }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Annotated, not lightweight: the tag carries the release message.
+          git tag -a "v${VERSION}" -m "suqo/suqo-php v${VERSION}"
+          git push origin "v${VERSION}"
+
+          php tools/release.php notes "${VERSION}" > /tmp/notes.md
+          gh release create "v${VERSION}" --title "v${VERSION}" --notes-file /tmp/notes.md
+
+      - name: Notify Packagist
+        # Done here, not in release.yml: a tag pushed with the built-in
+        # GITHUB_TOKEN does not trigger other workflows, so release.yml's
+        # `on: push: tags` would never fire for a release cut by the train.
+        if: steps.mode.outputs.mode == 'publish'
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
+        run: |
+          if [ -z "${PACKAGIST_USERNAME}" ] || [ -z "${PACKAGIST_TOKEN}" ]; then
+            echo "::warning::Packagist secrets not set; v${{ steps.mode.outputs.version }} is tagged but Packagist was not told."
+            exit 0
+          fi
+          curl -sS --fail-with-body -X POST \
+            -H 'content-type:application/json' \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}" \
+            -d '{"repository":{"url":"https://github.com/Code-Pros-AI/sdk-php"}}'
+
+      # ---------------------------------------------------------------- prepare
+
+      - name: Work out the next version
+        if: steps.mode.outputs.mode == 'prepare'
+        id: next
+        run: |
+          BUMP="$(php tools/release.php suggest)"
+
+          if [ "$BUMP" = "none" ]; then
+            echo "::notice::No releasable commits since the last tag. Nothing to prepare."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # `suggest` may return an exact version, when a commit carried a
+          # `Release-As:` footer.
+          if printf '%s' "$BUMP" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            VERSION="$BUMP"
+            REASON="pinned by a Release-As footer"
+          else
+            VERSION="$(php tools/release.php next "$BUMP")"
+            REASON="suggested bump: \`$BUMP\`"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "reason=$REASON"   >> "$GITHUB_OUTPUT"
+
+      - name: Prepare the Release PR
+        if: steps.mode.outputs.mode == 'prepare' && steps.next.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.next.outputs.version }}
+          REASON: ${{ steps.next.outputs.reason }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Always rebuild the branch from the current main, so the PR is a
+          # rewrite rather than an accumulation of superseded attempts.
+          git checkout -B release/next
+
+          php tools/release.php prepare "${VERSION}"
+
+          if git diff --quiet; then
+            echo "::notice::Nothing changed; leaving the existing Release PR alone."
+            exit 0
+          fi
+
+          git add CHANGELOG.md VERSIONING.md
+          git commit -m "chore(release): ${VERSION}"
+          git push --force origin release/next
+
+          BODY=$(cat <<EOF
+          Merging this cuts **v${VERSION}**: it tags the release, publishes the
+          GitHub Release, and tells Packagist to index it.
+
+          Version chosen automatically — ${REASON}.
+
+          **The bump is a suggestion, not a verdict.** Conventional Commit
+          prefixes cannot see every breaking change this SDK makes: widening a
+          property type or reordering a named argument can ship under \`fix:\`.
+          See [VERSIONING.md](VERSIONING.md) for the cases. To override, put
+          \`Release-As: X.Y.Z\` in a commit footer on \`main\` and this PR will
+          re-prepare itself.
+
+          This branch is rebuilt from \`main\` on every push, so do not commit
+          to it by hand — the next push will overwrite it.
+          EOF
+          )
+
+          if gh pr view release/next --json number >/dev/null 2>&1; then
+            gh pr edit release/next --title "chore(release): ${VERSION}" --body "$BODY"
+          else
+            gh pr create \
+              --base main --head release/next \
+              --title "chore(release): ${VERSION}" \
+              --body "$BODY" \
+              --label release || \
+            gh pr create \
+              --base main --head release/next \
+              --title "chore(release): ${VERSION}" \
+              --body "$BODY"
+          fi

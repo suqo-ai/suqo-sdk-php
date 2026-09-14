@@ -250,23 +250,44 @@ exposed either — see below.
 
 ## Needs a specification revision
 
-Four things in openapi.yaml have no §10 counterpart. §14 forbids public API surface
-this specification does not describe, so none of them is exposed and each is listed
+These operations have no §10 counterpart. §14 forbids public API surface this
+specification does not describe, so none of them is exposed and each is listed
 here instead of being quietly added.
 
 | openapi operationId | Path | Note |
 | --- | --- | --- |
 | `subscriptions_read` | `GET /api/v1/subscriptions/{id}/` | Would be `subscriptions.read` (N4). Needs a §10.2 row and a modelled response schema. |
 | `subscriptions_resume` | `POST /api/v1/subscriptions/{id}/resume/` | Would be `subscriptions.resume`, returning `MessageResponse`. Needs a §6.1 endpoint and a §10.2 row. |
-| `customers_list` | `GET /api/v1/customers/` | §10.3 mandates `NotImplementedError`; openapi now specifies the endpoint. |
-| `customers_read` | `GET /api/v1/customers/{id}/` | Same conflict. |
+| `customers_create` | `POST /api/v1/customers/` | Upsert semantics (201 new / 200 corrected). No §10 row. |
+| `customers_partial_update` | `PATCH /api/v1/customers/{id}/` | No §10 row. |
+| `webhooks_*` (eight) | `/api/v1/webhooks/…` | A whole management resource with no §10 counterpart. |
 
-The Customers resource resolves the §9.4 / §10.3 tension by splitting it the way
-the two sections are worded: `Model\Customer` is **un-stubbed**, because §9.4 ties
-that to openapi.yaml specifying the endpoints (it now does), while the operations
-still raise `NotImplementedError`, because §10.3 is normative for behaviour and §1
-gives this document behaviour. Their names come from the declared operationIds —
-`list` and `read`, plus `autoPaging` — so the shape is no longer a guess.
+### Customers — implemented 2026-09-11
+
+`customers_list` and `customers_read` were previously in the table above, with
+the operations raising `NotImplementedError` per §10.3 while `Model\Customer`
+stayed un-stubbed per §9.4.
+
+They are now implemented. The §9.4 / §10.3 tension was resolved in favour of
+§9.4 once the endpoints were confirmed against the live API: both the list
+envelope and the record shape were verified against real responses on
+2026-09-11, so neither the operation set nor the decoded shape is a guess. Names
+come from the declared operationIds minus the resource noun (N4) — `list` and
+`read`, plus the `autoPaging` counterpart §10.1 and §10.2 give every list.
+
+This needs the matching §10.3 revision in the specification proper; the SDK
+behaviour is recorded here so the two do not silently disagree. `customers_create`
+and `customers_partial_update` remain unexposed, since no §10 row covers them.
+
+Two shape corrections came out of the same confirmation, both breaking:
+
+- `Customer::$id` is `?string` (`cus_0390b1820`), not `?int`. The path parameter
+  is `public_id` in openapi for the same reason.
+- `Customer::$address` was missing from the record entirely.
+
+openapi's declared 200 schema for `customers_list` is a bare array. The live API
+returns the ordinary `{count, next, previous, results}` envelope, so the declared
+schema is a generation artifact and the SDK follows the live shape.
 
 ## Deviation from §4.3 — SANDBOX_URL
 

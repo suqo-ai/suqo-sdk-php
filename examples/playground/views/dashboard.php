@@ -31,7 +31,7 @@ declare(strict_types=1);
         <tr><td><a href="/products">Products</a></td><td class="num">products-&gt;list() / products-&gt;autoPaging()</td></tr>
         <tr><td><a href="/subscriptions">Subscriptions</a></td><td class="num">subscriptions-&gt;list() / cancel() / updateBillingCycle()</td></tr>
         <tr><td><a href="/subscriptions/new">Create</a></td><td class="num">subscriptions-&gt;create()</td></tr>
-        <tr><td><a href="/customers">Customers</a></td><td class="num">customers-&gt;list() — raises NotImplementedError (§10.3)</td></tr>
+        <tr><td><a href="/customers">Customers</a></td><td class="num">customers-&gt;list()</td></tr>
         <tr><td><a href="/webhook">Webhooks</a></td><td class="num">Webhook::verify() — no client, no key</td></tr>
     </table>
 </div>

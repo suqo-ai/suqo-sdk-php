@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace Suqo\Exception;
 
-use InvalidArgumentException;
-
 /**
  * §8.1 — raised during construction, before any request exists. It therefore
  * carries no status, request id or body.
  *
- * §8.1 permits this type to sit outside the {@see SuqoError} hierarchy where
- * the host language makes that natural; in PHP a construction-time argument
- * fault is idiomatically an \InvalidArgumentException, so it does.
+ * Derives from {@see SuqoError} so that a single `catch (SuqoError)` is total
+ * across the SDK, matching the TypeScript binding, where `SuqoConfigError`
+ * extends the same root. An earlier revision extended \InvalidArgumentException
+ * instead; that is the more literal PHP idiom for a construction-time argument
+ * fault, but it split the hierarchy and surprised callers who had written the
+ * obvious catch-all.
  */
-final class SuqoConfigError extends InvalidArgumentException
+final class SuqoConfigError extends SuqoError
 {
 }

@@ -10,12 +10,15 @@ namespace Suqo\Model;
  */
 final class ProductPlan extends Model
 {
-    /** @param array<string, mixed> $wire */
+    /**
+     * @param list<BillingPeriod>  $billingPeriods
+     * @param array<string, mixed> $wire
+     */
     private function __construct(
         public readonly ?string $planId,
         public readonly ?string $planName,
         public readonly ?string $description,
-        public readonly ?string $billingPeriods,
+        public readonly array $billingPeriods,
         array $wire,
     ) {
         parent::__construct($wire);
@@ -28,7 +31,10 @@ final class ProductPlan extends Model
             Wire::nstr($wire, 'plan_id'),
             Wire::nstr($wire, 'plan_name'),
             Wire::nstr($wire, 'description'),
-            Wire::nstr($wire, 'billing_periods'),
+            array_map(
+                static fn (array $record): BillingPeriod => BillingPeriod::fromWire($record),
+                Wire::objectList($wire, 'billing_periods'),
+            ),
             $wire,
         );
     }

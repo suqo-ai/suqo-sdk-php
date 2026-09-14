@@ -1,0 +1,25 @@
+# Everything below is for developing the SDK, not for consuming it. Without
+# `export-ignore` these land in every consumer's vendor/ directory on every
+# `composer install`, since Composer installs from a GitHub-generated archive of
+# the tag rather than from a built artifact.
+#
+# Verify before tagging:  git archive --format=zip HEAD -o /tmp/dist.zip && unzip -l /tmp/dist.zip
+
+/tests                  export-ignore
+/examples               export-ignore
+/tools                  export-ignore
+/docs                   export-ignore
+/.github                export-ignore
+
+/.editorconfig          export-ignore
+/.gitattributes         export-ignore
+/.gitignore             export-ignore
+/.php-cs-fixer.dist.php export-ignore
+/phpunit.xml.dist       export-ignore
+/phpstan.neon.dist      export-ignore
+/composer.lock          export-ignore
+
+/BINDING.md             export-ignore
+/VERSIONING.md          export-ignore
+
+# Kept in the package: src/, composer.json, README.md, LICENSE, CHANGELOG.md.

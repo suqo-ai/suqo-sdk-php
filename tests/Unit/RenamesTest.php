@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Suqo\Tests\Unit;
 
 use Suqo\Model\Subscription;
+use Suqo\Model\SubscriptionStatus;
 use Suqo\Params\CreateSubscriptionParams;
 use Suqo\Params\CustomerBilling;
 use Suqo\Params\CustomerInput;
@@ -167,16 +168,21 @@ final class RenamesTest extends TransportTestCase
         self::assertArrayNotHasKey('customer', $raw);
     }
 
-    public function testTheCreateResponseAlsoAppliesTheReadRename(): void
+    /**
+     * The 201 body is its own schema, not an echo of the request: it carries the
+     * new subscription's id, status and checkout URL, and neither `return_url`
+     * nor `client` comes back. The write-direction rename still applies to the
+     * *request*, which is what this asserts on the recorded payload.
+     */
+    public function testTheCreateResponseCarriesTheCheckoutUrl(): void
     {
         $client = (new MockHttpClient())->pushJson(201, [
+            'created_at' => '2026-07-03T10:15:00Z',
             'pbp_id' => 'pbp_3n9k2x',
-            'return_url' => 'https://merchant.example.com/thanks',
-            'client' => [
-                'phone' => '9841000100',
-                'full_name' => 'Ram Shrestha',
-                'email' => 'ram@client.com',
-            ],
+            'subscription_id' => '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+            'status' => 'pending_checkout',
+            'checkout_url' => 'https://app.suqo.ai/pay/3fa85f64-5717-4562-b3fc-2c963f66afa6',
+            'next_billing_cycle' => '2026-08-03T00:00:00Z',
         ]);
 
         $created = (new Subscriptions($this->transport($client)))->create(new CreateSubscriptionParams(
@@ -189,9 +195,20 @@ final class RenamesTest extends TransportTestCase
         ));
 
         self::assertSame('pbp_3n9k2x', $created->pbpId);
-        self::assertSame('https://merchant.example.com/thanks', $created->returnUrl);
-        self::assertSame('ram@client.com', $created->customer?->email);
-        self::assertArrayHasKey('client', $created->toArray());
+        self::assertSame('3fa85f64-5717-4562-b3fc-2c963f66afa6', $created->subscriptionId);
+        self::assertSame(SubscriptionStatus::PendingCheckout, $created->status);
+        self::assertSame(
+            'https://app.suqo.ai/pay/3fa85f64-5717-4562-b3fc-2c963f66afa6',
+            $created->checkoutUrl,
+        );
+        self::assertSame('2026-08-03T00:00:00Z', $created->nextBillingCycle);
+        self::assertSame('2026-07-03T10:15:00Z', $created->createdAt);
+
+        // The request still carries the write-direction rename.
+        $sent = json_decode($client->lastRequest()->body ?? '', true);
+        self::assertIsArray($sent);
+        self::assertArrayHasKey('client', $sent);
+        self::assertArrayNotHasKey('customer', $sent);
     }
 
     /**

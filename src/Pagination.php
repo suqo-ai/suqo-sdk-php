@@ -6,6 +6,7 @@ namespace Suqo;
 
 use Generator;
 use Suqo\Exception\CancelledError;
+use Suqo\Exception\SuqoError;
 use Suqo\Http\Transport;
 use Suqo\Model\Wire;
 
@@ -18,6 +19,17 @@ use Suqo\Model\Wire;
  */
 final class Pagination
 {
+    /**
+     * §11.2 — the most pages one iteration will follow before giving up.
+     *
+     * `next` is server-supplied and followed without a bound otherwise, so a
+     * link that points at its own page — a backend bug, or a tampered response —
+     * would spin forever, issuing requests the caller never asked for. The cap
+     * is far above any real collection; reaching it means the server is not
+     * advancing, not that the data ran out. Matches the TypeScript binding.
+     */
+    public const MAX_PAGES = 10_000;
+
     /**
      * @template T
      *
@@ -35,8 +47,17 @@ final class Pagination
     ): Generator {
         $cancellation ??= Cancellation::none();
         $url = $firstUrl;
+        $pagesSeen = 0;
 
         while ($url !== null) {
+            if (++$pagesSeen > self::MAX_PAGES) {
+                throw new SuqoError(sprintf(
+                    'Auto-paging exceeded %d pages without reaching the end of the collection. '
+                    . 'The server is not advancing: check for a next link that repeats a page.',
+                    self::MAX_PAGES,
+                ));
+            }
+
             // Checked before each fetch, so a cancelled iteration stops at the
             // current page boundary rather than after draining the collection.
             if ($cancellation->isCancelled()) {

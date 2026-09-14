@@ -6,7 +6,9 @@ namespace Suqo\Tests\Unit;
 
 use Suqo\Cancellation;
 use Suqo\Exception\CancelledError;
+use Suqo\Exception\SuqoError;
 use Suqo\Model\Product;
+use Suqo\Pagination;
 use Suqo\Resource\Products;
 use Suqo\Tests\Support\MockHttpClient;
 use Suqo\Tests\Support\TransportTestCase;
@@ -149,5 +151,39 @@ final class PaginationTest extends TransportTestCase
                 $ids,
             ),
         ];
+    }
+
+    /**
+     * §11.2 — `next` is server-supplied and followed without a bound otherwise.
+     * A link that points back at its own page would spin forever, issuing
+     * requests the caller never asked for; the origin guard does not help,
+     * because a self-referencing link is same-origin.
+     */
+    public function testAutoPagingRefusesToFollowAnEndlessNextChain(): void
+    {
+        $selfReferencing = [
+            'count' => 1,
+            'next' => 'https://test-be.suqo.ai/api/v1/products/?page=1',
+            'previous' => null,
+            'results' => [['product_id' => 'prd_1']],
+        ];
+
+        // One more page than the cap allows, so the guard is what stops it.
+        $client = (new MockHttpClient())->pushJson(200, $selfReferencing, times: Pagination::MAX_PAGES + 1);
+
+        $pages = Pagination::autoPage(
+            $this->transport($client),
+            'https://test-be.suqo.ai/api/v1/products/',
+            static fn (array $record): array => $record,
+        );
+
+        try {
+            iterator_to_array($pages);
+            self::fail('Expected auto-paging to refuse an endless next chain.');
+        } catch (SuqoError $e) {
+            self::assertStringContainsString('exceeded ' . Pagination::MAX_PAGES . ' pages', $e->getMessage());
+        }
+
+        self::assertSame(Pagination::MAX_PAGES, $client->attempts());
     }
 }

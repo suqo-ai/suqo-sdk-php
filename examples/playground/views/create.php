@@ -15,9 +15,13 @@ declare(strict_types=1);
     <div class="panel" style="border-color: var(--ok)">
         <h2 style="margin-top:0">Created</h2>
         <dl class="kv">
+            <dt>subscriptionId</dt><dd><code><?= e($result->subscriptionId) ?></code></dd>
             <dt>pbpId</dt><dd><?= e($result->pbpId) ?></dd>
-            <dt>returnUrl</dt><dd><?= e($result->returnUrl) ?></dd>
-            <dt>customer</dt><dd><?= e($result->customer?->fullName) ?> &lt;<?= e($result->customer?->email) ?>&gt;</dd>
+            <dt>status</dt><dd><?= e($result->status instanceof \Suqo\Model\SubscriptionStatus
+                ? $result->status->value
+                : $result->status) ?></dd>
+            <dt>checkoutUrl</dt><dd><a href="<?= e($result->checkoutUrl) ?>" rel="noreferrer noopener" target="_blank"><?= e($result->checkoutUrl) ?></a></dd>
+            <dt>nextBillingCycle</dt><dd><?= e($result->nextBillingCycle ?? '—') ?></dd>
         </dl>
         <h2>Response, raw</h2>
         <pre><?= e(json($result->toArray())) ?></pre>

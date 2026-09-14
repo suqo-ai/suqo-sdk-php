@@ -2,39 +2,49 @@
 
 declare(strict_types=1);
 
+/** @var \Suqo\Model\Page<\Suqo\Model\Customer>|null $page */
 /** @var \Suqo\Exception\SuqoError|null $error */
 ?>
 <h1>Customers</h1>
-<p class="lede">The resource exists so the shape of the client is stable; every operation refuses (§10.3).</p>
+<p class="lede">Read-only. A customer is created implicitly the first time someone subscribes.</p>
 
 <?php require __DIR__ . '/_error.php'; ?>
 
-<div class="panel">
-    <h2 style="margin-top:0">Why</h2>
-    <p class="muted" style="margin:0 0 10px">
-        openapi.yaml declares <code>GET /customers/</code> and <code>GET /customers/{id}/</code>, but
-        §10.3 of the specification mandates <code>NotImplementedError</code> and §14 forbids adding
-        public surface the specification does not describe. Implementing them is a specification
-        revision, not an SDK decision.
-    </p>
-    <p class="muted" style="margin:0">
-        The record type is already un-stubbed, because §9.4 ties that to openapi.yaml rather than to
-        §10.3. Decoding a record works today:
-    </p>
-    <?php
-    $sample = \Suqo\Model\Customer::fromWire([
-        'id' => 7,
-        'buyer_phone' => '9841000100',
-        'buyer_email' => 'ram@client.com',
-        'full_name' => 'Ram Shrestha',
-        'created_at' => '2026-07-03T10:15:00Z',
-    ]);
-    ?>
-    <dl class="kv" style="margin-top:12px">
-        <dt>id</dt><dd><?= (int) $sample->id ?></dd>
-        <dt>buyerPhone</dt><dd><?= e($sample->buyerPhone) ?></dd>
-        <dt>buyerEmail</dt><dd><?= e($sample->buyerEmail) ?></dd>
-        <dt>fullName</dt><dd><?= e($sample->fullName) ?></dd>
-        <dt>createdAt</dt><dd><?= e($sample->createdAt) ?></dd>
-    </dl>
-</div>
+<?php if ($page !== null) { ?>
+    <p class="muted"><?= (int) $page->count ?> total.
+        <code>id</code> is a public id (<code>cus_…</code>) — not an integer, not a UUID.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>id</th><th>phone</th><th>email</th><th>name</th><th>address</th><th>created</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($page->results as $customer) { ?>
+                <tr>
+                    <td><code><?= e($customer->id) ?></code></td>
+                    <td><?= e($customer->buyerPhone) ?></td>
+                    <td><?= e($customer->buyerEmail ?? '—') ?></td>
+                    <td><?= e($customer->fullName ?? '—') ?></td>
+                    <td><?= e($customer->address ?? '—') ?></td>
+                    <td class="muted"><?= e($customer->createdAt) ?></td>
+                </tr>
+            <?php } ?>
+        </tbody>
+    </table>
+
+    <?php if ($page->results === []) { ?>
+        <p class="muted">No customers on this account yet.</p>
+    <?php } ?>
+
+    <div class="panel">
+        <h2 style="margin-top:0">Nullability</h2>
+        <p class="muted" style="margin:0">
+            Every field except <code>id</code>, <code>buyerPhone</code> and <code>createdAt</code>
+            can be null — the em dashes above are real nulls, not empty strings. Timestamps carry
+            microseconds and a <code>+05:45</code> offset rather than <code>Z</code>, and are kept
+            as opaque strings.
+        </p>
+    </div>
+<?php } ?>

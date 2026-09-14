@@ -1,27 +1,32 @@
 # Customers
 
-`$suqo->customers` — `Suqo\Resource\Customers`. **Every method throws.** The
-resource exists so that the shape of the client is stable across the version that
-implements it: a call site written today keeps compiling when the operations land.
+`$suqo->customers` — `Suqo\Resource\Customers`. Read-only: a customer record is
+created implicitly the first time someone subscribes, through
+[`subscriptions->create()`](subscriptions.md#create)'s `customer` field.
 
-```php
-use Suqo\Exception\NotImplementedError;
+openapi also declares `customers_create` and `customers_partial_update`. Neither
+is exposed — see [BINDING.md](../BINDING.md#needs-a-specification-revision).
 
-try {
-    $suqo->customers->list();
-} catch (NotImplementedError $e) {
-    echo $e->getMessage();     // customers API not yet available in this SDK version
-    echo $e->status;           // 0 — no request was made
-}
-```
+## The record
 
-`NotImplementedError extends SuqoError`, so it is caught by a `catch (SuqoError)`
-ladder like any other SDK failure. `status` is `0` and `requestId` is `''`, because
-nothing was sent.
+`Suqo\Model\Customer` — `id`, `buyerPhone`, `buyerEmail`, `fullName`, `address`,
+`createdAt` (all `?string`), plus `toArray()`.
 
-The record type is already real: `Suqo\Model\Customer` exists and is not a stub —
-`id` (`?int`), `buyerPhone`, `buyerEmail`, `fullName`, `createdAt` (all `?string`),
-plus `toArray()`. Only the operations are missing.
+`id` is a **prefixed public id** (`cus_0390b1820`) — not an integer, and not a
+UUID like the subscription ids elsewhere in the API. openapi names the path
+parameter `public_id` for that reason.
+
+Every field except `id`, `buyerPhone` and `createdAt` can be `null` in practice;
+a record with only a phone number on file is normal. `createdAt` carries
+microseconds and a `+05:45` offset rather than `Z`, and is kept as an opaque
+string like every other timestamp.
+
+`buyerPhone` and `buyerEmail` keep their wire stems: the `client` → `customer`
+rename covers the field named `client`, and N7 makes that table the complete set.
+This record is a different shape from the `customer` embedded on a subscription
+(`SubscriptionCustomer`, which has `phone`/`fullName`/`email` with no prefix plus
+nested `billing`/`shipping`). They both describe a buyer; they are not the same
+type, and the SDK never conflates them.
 
 ## `list`
 
@@ -30,14 +35,38 @@ public function list(
     ?int $page = null,
     ?int $pageSize = null,
     ?Cancellation $cancellation = null,
-): never
+): Page
 ```
 
-Reserved for `GET /api/v1/customers/` (openapi `customers_list`). Will return
-`Page<Customer>`.
+`GET /api/v1/customers/` (openapi `customers_list`).
 
-**Throws** `NotImplementedError` immediately. No parameter is validated, no request
-is made.
+| Parameter | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `page` | `?int` | `null` | Omitted from the query when null. |
+| `pageSize` | `?int` | `null` | Sent as `page_size`. |
+| `cancellation` | `?Cancellation` | `null` | |
+
+**Returns** `Page<Customer>` — `count`, `next`, `previous`, `results`.
+
+**Throws** `AuthenticationError` on 401, `PermissionDeniedError` on 403,
+`SuqoError` otherwise. Retried automatically like any other `GET`.
+
+> openapi declares this response as a bare array. The live API returns the
+> ordinary `{count, next, previous, results}` envelope, so the declared schema is
+> a generation artifact and the SDK decodes the envelope. Verified against a real
+> response 2026-09-11.
+
+```php
+$page = $suqo->customers->list(pageSize: 50);
+
+echo $page->count, PHP_EOL;
+
+foreach ($page->results as $customer) {
+    echo $customer->id, ' ', $customer->buyerPhone, PHP_EOL;
+    echo '  ', $customer->fullName ?? '(no name)', PHP_EOL;
+    echo '  ', $customer->address ?? '(no address)', PHP_EOL;
+}
+```
 
 ## `autoPaging`
 
@@ -49,29 +78,39 @@ public function autoPaging(
 ): Generator
 ```
 
-Reserved for the lazy counterpart every list resource gets. Will return
-`Generator<int, Customer>`.
+**Returns** `Generator<int, Customer>` — lazy, a page at a time, following the
+server's `next` link until it is null. Nothing is accumulated.
 
-**Throws** `NotImplementedError` — and unusually for a generator method, it throws
-on *call*, not on first iteration, because the throw precedes any `yield`.
+```php
+foreach ($suqo->customers->autoPaging(cancellation: $token) as $customer) {
+    handle($customer);
+}
+```
 
 ## `read`
 
 ```php
-public function read(string $id, ?Cancellation $cancellation = null): never
+public function read(string $id, ?Cancellation $cancellation = null): Customer
 ```
 
-Reserved for `GET /api/v1/customers/{id}/` (openapi `customers_read`). Will return a
-single `Customer`.
+`GET /api/v1/customers/{public_id}/` (openapi `customers_read`).
 
-**Throws** `NotImplementedError`.
+| Parameter | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `id` | `string` | — | The public id (`cus_…`) from a list or read. Escaped into the path. |
+| `cancellation` | `?Cancellation` | `null` | |
 
-## Why it is not implemented
+**Returns** `Customer`.
 
-The operations are specified in openapi, so the method set above is not a guess — it
-is those two operationIds minus the resource noun, plus the auto-paging counterpart.
-Shipping them is a specification revision rather than a binding decision: the
-specification is normative for behaviour and forbids public surface it does not
-itself describe. Recorded in [BINDING.md](../BINDING.md#needs-a-specification-revision),
-along with the other operations in the same position (`subscriptions_read`,
-`subscriptions_resume`).
+**Throws** `NotFoundError` on 404 — including for an id belonging to another
+environment, which looks identical. `AuthenticationError` on 401,
+`PermissionDeniedError` on 403.
+
+```php
+$customer = $suqo->customers->read('cus_0390b1820');
+
+echo $customer->buyerEmail ?? '-', PHP_EOL;
+```
+
+The operation is named `read`, not `retrieve`: N4 takes the name from the
+declared operationId (`customers_read`) minus the resource noun.

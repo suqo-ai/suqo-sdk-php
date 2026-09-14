@@ -6,58 +6,91 @@ namespace Suqo\Resource;
 
 use Generator;
 use Suqo\Cancellation;
-use Suqo\Constants;
-use Suqo\Exception\NotImplementedError;
+use Suqo\Endpoints;
+use Suqo\Model\Customer;
+use Suqo\Model\Page;
+use Suqo\Pagination;
 
 /**
  * §10.3 — the customers resource.
  *
- * Every operation raises {@see NotImplementedError} carrying MSG_NOT_IMPLEMENTED.
- * The resource exists so that the shape of the client is stable across the version
- * that implements it.
+ * Read-only: a customer record is created implicitly the first time someone
+ * subscribes, through `subscriptions->create()`'s `customer` field. openapi also
+ * declares `customers_create` and `customers_partial_update`; those are not
+ * exposed here, because §14 still forbids surface the specification does not
+ * describe and no §10.3 row covers them.
  *
- * openapi.yaml now specifies `GET /customers/` (`customers_list`) and
- * `GET /customers/{id}/` (`customers_read`), so the operation set below is no
- * longer a guess — it is those two operationIds minus the resource noun (N4),
- * plus the auto-paging counterpart §10.1 and §10.2 give every list. Implementing
- * them is a specification revision, not a binding decision: §10.3 is normative
- * for behaviour, and §14 forbids public surface this specification does not
- * describe. The record type they will return is already un-stubbed
- * ({@see \Suqo\Model\Customer}) because §9.4 ties that to openapi.yaml, not to
- * §10.3.
+ * The operation names come from the declared operationIds minus the resource
+ * noun (N4): `customers_list` → `list`, `customers_read` → `read`, plus the
+ * auto-paging counterpart §10.1 and §10.2 give every list.
  */
 final class Customers extends AbstractResource
 {
-    /** @throws NotImplementedError */
+    /**
+     * §10.3 — GET customers.
+     *
+     * @return Page<Customer>
+     *
+     * @throws \Suqo\Exception\SuqoError
+     */
     public function list(
         ?int $page = null,
         ?int $pageSize = null,
         ?Cancellation $cancellation = null,
-    ): never {
-        throw self::unavailable();
+    ): Page {
+        $response = $this->transport->request(
+            'GET',
+            Endpoints::CUSTOMERS,
+            null,
+            self::pageQuery($page, $pageSize),
+            $cancellation,
+        );
+
+        return Page::fromWire(
+            $response->object(),
+            static fn (array $record): Customer => Customer::fromWire($record),
+        );
     }
 
     /**
-     * @return Generator<int, never>
+     * §10.3 — a lazy sequence of customers across every page.
      *
-     * @throws NotImplementedError
+     * @return Generator<int, Customer>
+     *
+     * @throws \Suqo\Exception\SuqoError
      */
     public function autoPaging(
         ?int $page = null,
         ?int $pageSize = null,
         ?Cancellation $cancellation = null,
     ): Generator {
-        throw self::unavailable();
+        return Pagination::autoPage(
+            $this->transport,
+            $this->transport->url(Endpoints::CUSTOMERS, self::pageQuery($page, $pageSize)),
+            static fn (array $record): Customer => Customer::fromWire($record),
+            $cancellation,
+        );
     }
 
-    /** @throws NotImplementedError */
-    public function read(string $id, ?Cancellation $cancellation = null): never
+    /**
+     * §10.3 — GET one customer.
+     *
+     * @param string $id The public id (`cus_…`) from the `id` field of a list or
+     *                   read. Not an integer and not a UUID; openapi names the
+     *                   path parameter `public_id` for that reason.
+     *
+     * @throws \Suqo\Exception\SuqoError
+     */
+    public function read(string $id, ?Cancellation $cancellation = null): Customer
     {
-        throw self::unavailable();
-    }
+        $response = $this->transport->request(
+            'GET',
+            Endpoints::customerRead($id),
+            null,
+            [],
+            $cancellation,
+        );
 
-    private static function unavailable(): NotImplementedError
-    {
-        return new NotImplementedError(Constants::MSG_NOT_IMPLEMENTED);
+        return Customer::fromWire($response->object());
     }
 }
