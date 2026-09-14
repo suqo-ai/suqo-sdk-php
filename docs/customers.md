@@ -5,7 +5,8 @@ created implicitly the first time someone subscribes, through
 [`subscriptions->create()`](subscriptions.md#create)'s `customer` field.
 
 openapi also declares `customers_create` and `customers_partial_update`. Neither
-is exposed — see [BINDING.md](../BINDING.md#needs-a-specification-revision).
+is exposed: §14 forbids public surface the specification does not describe, and
+no §10 row covers them.
 
 ## The record
 

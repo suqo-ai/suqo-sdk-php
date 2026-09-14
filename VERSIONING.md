@@ -86,20 +86,40 @@ merge commits all work.
 ### Choosing the version
 
 The train suggests a bump from the Conventional Commit prefixes since the last
-tag, using the pre-1.0 rules in this document: while under `1.0.0`, a breaking
-change bumps the **minor** and a `feat:` bumps the **patch**.
+tag, by plain SemVer: a breaking change bumps the **major**, a `feat:` the
+**minor**, a `fix:` the **patch**.
 
 **Treat that as a suggestion, not a verdict.** The prefixes cannot see every
 breaking change this SDK makes — the table above lists cases where widening a
-property type or reordering a named argument ships under `fix:`, and exactly
-that has already happened here. To override, put a footer on any commit on
-`main`:
+property type or reordering a named argument ships under `fix:`. Nor is there
+any prefix that means "promote to 1.0.0", which is a statement about stability
+rather than a change.
+
+To pin an exact version, put the directive in the CHANGELOG's `[Unreleased]`
+section, as an HTML comment so it does not render:
+
+```markdown
+## [Unreleased]
+
+<!-- Release-As: 1.0.0 -->
+```
+
+The train reads it and prepares the Release PR at that version, then the
+directive disappears with the rest of `[Unreleased]` when the section is moved
+under its dated heading — so it applies to exactly one release and cannot leak
+into the next.
+
+The same directive also works as a commit footer:
 
 ```
-Release-As: 0.2.0
+Release-As: 1.0.0
 ```
 
-The train picks it up and re-prepares the Release PR at that version.
+**Prefer the CHANGELOG form.** A commit footer does not survive a squash merge:
+GitHub composes a fresh message from the PR title and body, the footer is
+dropped, and the train falls back to prefix inference. For a release whose only
+signal was that footer, inference returns `none` and **no Release PR appears at
+all** — a failure that looks exactly like the train not running.
 
 ### Running the steps by hand
 
@@ -142,16 +162,22 @@ Every real release adds a row, marked `Shipped` once it is actually published.
 | --- | --- | --- | --- |
 | `0.1.0` | `v1` | Initial release | Shipped |
 
-## Pre-1.0
+## Stability, from 1.0.0
 
-While the version is `0.x`, SemVer makes no compatibility promise and the minor
-acts as the major: `0.1.0` → `0.2.0` may break. That is deliberate for the first
-releases, because several parts of the surface are still being reconciled against
-the live API. The `0.1.0` work already included breaking changes to model types
-and to `SuqoConfigError`'s base class, and more are likely as the remaining
-unexposed operations land.
+`1.0.0` is the point at which the public surface stops moving without a major
+version. Concretely, from that release onwards:
 
-Tag `1.0.0` only when you are willing to hold the current public surface stable,
-and are content that the unexposed operations (`subscriptions.read`,
-`subscriptions.resume`, the Customers write operations, the Webhooks management
-resource) landing later are *minor* bumps.
+- A breaking change — anything in the table above marked *yes* — requires a
+  **MAJOR** bump, and is announced one minor in advance wherever the change can
+  be deprecated rather than simply made.
+- The operations openapi declares but this SDK does not yet expose
+  (`subscriptions_read`, `subscriptions_resume`, the Customers write operations,
+  the Webhooks management resource) are **additive**. Each lands as a **MINOR**,
+  never a major, because adding a method breaks nobody.
+- `0.1.0` and `1.0.0` are the same code. The promotion is a statement about
+  stability, not a change in behaviour.
+
+The `0.x` rule that preceded this — where the minor acted as the major and no
+compatibility was promised — no longer applies. It is recorded here only so the
+`0.1.0` row below reads correctly in hindsight.
+

@@ -1,7 +1,7 @@
 # SUQO PHP SDK
 
 Official PHP SDK for the [SUQO](https://suqo.ai) API. Implements **SUQO SDK —
-Specification v2.0**; binding decisions are recorded in [BINDING.md](BINDING.md).
+Specification v2.0**.
 
 This page is the quick start. For a per-method reference — every parameter, return
 type and thrown exception — see **[docs/](https://suqo.ai/docs/sdk/php)**. For
