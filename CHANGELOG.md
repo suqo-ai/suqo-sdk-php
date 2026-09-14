@@ -102,10 +102,11 @@ practice, so both bindings classify a given response the same way:
 - `customers->*` no longer raises `NotImplementedError`; the operations are
   implemented. The exception type is kept but is currently raised by nothing.
 
-Releases are cut by the **Tag release** workflow; see
-[VERSIONING.md](VERSIONING.md#cutting-a-release). Entries above move under a
-dated version heading automatically, so add new ones under `## [Unreleased]`
-and leave the rest alone.
+Releases run on a train; see
+[VERSIONING.md](VERSIONING.md#cutting-a-release). Merging a PR into `main` opens
+a Release PR, and merging that cuts the release. Entries above move under a
+dated version heading automatically, so add new ones under `## [Unreleased]` and
+leave the rest alone.
 
 [Unreleased]: https://github.com/Code-Pros-AI/sdk-php/commits/main
 

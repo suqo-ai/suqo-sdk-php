@@ -172,7 +172,25 @@ and between pages.
 
 ### `NotImplementedError` — status 0
 
-Raised by every `$suqo->customers` method. See [customers.md](customers.md).
+**Nothing raises this today.** It was the error every `$suqo->customers` method
+returned before those operations were implemented. The type is kept as the
+declared error for a resource added to the client's shape ahead of its
+operations, so a call site written against a future resource keeps compiling.
+
+### Auto-paging gave up — base `SuqoError`
+
+`autoPaging()` follows the server's `next` link until it is null. If the server
+never stops advancing — a `next` that points back at its own page, whether from
+a backend bug or a tampered response — the iteration would otherwise run
+forever, issuing requests you never asked for.
+
+It stops after `Suqo\Pagination::MAX_PAGES` (10 000) and raises a base
+`SuqoError` naming the cause. Reaching it means the server is not advancing, not
+that the collection ran out: no real catalogue is that large.
+
+`status` is `0`, because this is the SDK refusing rather than an HTTP failure.
+Note that the same-origin guard does **not** catch this case — a link repeating
+its own page is on the right host.
 
 ### `SuqoConfigError`
 

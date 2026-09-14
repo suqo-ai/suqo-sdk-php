@@ -69,6 +69,10 @@ public function autoPaging(
 `GET /api/v1/products/`, then each `next` link in turn. A lazy sequence of products
 across every page.
 
+Stops after `Pagination::MAX_PAGES` (10 000) with a `SuqoError` if the server never
+stops advancing — a `next` link that repeats a page would otherwise iterate forever.
+See [errors.md](errors.md#auto-paging-gave-up--base-suqoerror).
+
 | Parameter | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `page` | `?int` | `null` | The page to *start* from. |

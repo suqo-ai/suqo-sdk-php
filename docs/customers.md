@@ -82,6 +82,10 @@ public function autoPaging(
 **Returns** `Generator<int, Customer>` — lazy, a page at a time, following the
 server's `next` link until it is null. Nothing is accumulated.
 
+Stops after `Pagination::MAX_PAGES` (10 000) with a `SuqoError` if the server never
+stops advancing — a `next` link that repeats a page would otherwise iterate forever.
+See [errors.md](errors.md#auto-paging-gave-up--base-suqoerror).
+
 ```php
 foreach ($suqo->customers->autoPaging(cancellation: $token) as $customer) {
     handle($customer);

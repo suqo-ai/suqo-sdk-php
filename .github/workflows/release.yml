@@ -11,7 +11,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 jobs:
   release:
@@ -24,7 +24,7 @@ jobs:
         with:
           # The floor the package claims to support, so the gate runs against
           # the oldest runtime a consumer may have.
-          php-version: '8.1'
+          php-version: "8.1"
           extensions: curl, json, hash
           coverage: none
 
@@ -54,22 +54,3 @@ jobs:
             echo "::error::No tag name"; exit 1
           fi
           echo "Releasing ${GITHUB_REF_NAME}"
-
-      - name: Notify Packagist
-        # Secrets required on the repository:
-        #   PACKAGIST_USERNAME  your packagist.org username
-        #   PACKAGIST_TOKEN     packagist.org/profile/ -> Show API token
-        # Without them this step fails loudly rather than silently skipping, so a
-        # missing secret cannot look like a successful release.
-        env:
-          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
-          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
-        run: |
-          if [ -z "${PACKAGIST_USERNAME}" ] || [ -z "${PACKAGIST_TOKEN}" ]; then
-            echo "::error::PACKAGIST_USERNAME / PACKAGIST_TOKEN are not set."
-            exit 1
-          fi
-          curl -sS --fail-with-body -X POST \
-            -H 'content-type:application/json' \
-            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}" \
-            -d '{"repository":{"url":"https://github.com/Code-Pros-AI/sdk-php"}}'

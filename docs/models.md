@@ -122,7 +122,7 @@ properties and `toArray()`.
 | `SubscriptionCustomerBilling` | `businessName`, `email`, `address`, `panVat` |
 | `SubscriptionCustomerShipping` | `phone`, `fullName`, `email`, `address` |
 | `SubscriptionProduct` | `productId`, `name`, `planName`, `pbpId`, `label`, `price`, `currency` |
-| `Customer` | `id` (`?int`), `buyerPhone`, `buyerEmail`, `fullName`, `createdAt` |
+| `Customer` | `id` (a `cus_…` public id, not an integer), `buyerPhone`, `buyerEmail`, `fullName`, `address`, `createdAt` |
 | `CreateSubscriptionResponse` | `subscriptionId`, `pbpId`, `status` (`SubscriptionStatus\|string\|null`), `checkoutUrl`, `nextBillingCycle`, `createdAt` |
 | `MessageResponse` | `message` (`string`, non-null, `''` when absent) |
 
@@ -252,10 +252,15 @@ public function __construct(
 Wire keys: `phone`, `full_name`, `email`, `address`, `billing`, `shipping`. The last
 three are omitted from the body when null.
 
-`toWire(): array` serialises nested objects too. `fromWire(array): self` reads the
-shape back — openapi reuses this schema for the 201 response body. `fromWire()` is
-tolerant: a missing or non-string required field becomes `''`, and a nested value
-that is not an object becomes `null`.
+`toWire(): array` serialises nested objects too.
+
+`fromWire(array): self` reads the shape back. It exists because openapi once
+declared the 201 body as a reuse of this request schema; it no longer does — the
+response is its own shape ({@see CreateSubscriptionResponse}) and carries no
+customer at all. Nothing in the SDK calls `fromWire()` today, and it is kept only
+so callers who stored a serialised payload can rebuild one. It is tolerant: a
+missing or non-string required field becomes `''`, and a nested value that is not
+an object becomes `null`.
 
 ### `CustomerBilling`
 

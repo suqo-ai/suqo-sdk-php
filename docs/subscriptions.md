@@ -63,6 +63,10 @@ public function autoPaging(
 
 `GET /api/v1/subscriptions/`, then each `next` link. A lazy sequence of
 subscriptions across every page; a page is fetched only once the previous one is
+
+Stops after `Pagination::MAX_PAGES` (10 000) with a `SuqoError` if the server never
+stops advancing — a `next` link that repeats a page would otherwise iterate forever.
+See [errors.md](errors.md#auto-paging-gave-up--base-suqoerror).
 exhausted.
 
 **Returns** `Generator<int, Subscription>`. The `customer` ⇄ `client` rename applies
