@@ -8,6 +8,10 @@ project follows [Semantic Versioning](https://semver.org/) as described in
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] - 2026-09-14
+
 <!-- Release-As: 1.0.0 -->
 
 ### Changed

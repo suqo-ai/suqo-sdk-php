@@ -173,6 +173,7 @@ Every real release adds a row, marked `Shipped` once it is actually published.
 | SDK version | Supported API version | Change type | Status |
 | --- | --- | --- | --- |
 | `0.1.0` | `v1` | Initial release | Shipped |
+| `1.0.0` | `v1` | See CHANGELOG | Shipped |
 
 ## Stability, from 1.0.0
 
