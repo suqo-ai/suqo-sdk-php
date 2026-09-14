@@ -61,6 +61,56 @@ Anything to be removed is deprecated one minor ahead: documented in the
 CHANGELOG, marked `@deprecated` in the docblock, and left working. It is removed
 only at the next major. Nothing is ever removed in a minor or a patch.
 
+## Cutting a release
+
+Releases are cut by the **Tag release** workflow (Actions → *Tag release* → *Run
+workflow*), not by hand. Pick `patch`, `minor` or `major` — or type an exact
+version to override — and it will:
+
+1. run the full gate against the chosen ref (`composer validate --strict`,
+   invariants, lint, PHPStan, tests);
+2. resolve the next version from the newest `v*` tag, refusing one that already
+   exists, because a published tag is never moved;
+3. move the CHANGELOG's `[Unreleased]` entries under a dated `## [X.Y.Z]`
+   heading and open a fresh empty `[Unreleased]`;
+4. mark the version `Shipped` in the table below, adding a row if it is absent;
+5. commit `chore(release): X.Y.Z`, create an annotated `vX.Y.Z` tag, push both;
+6. create the GitHub Release with that CHANGELOG section as its body;
+7. tell Packagist to index the new tag.
+
+Tick **dry run** to do steps 1–4 and print the diff without tagging. That is the
+safe way to check what a release would contain.
+
+**The bump is your decision, deliberately.** It is not inferred from commit
+messages, because the breaking changes in this SDK are mostly invisible to a
+Conventional Commits prefix — see the table above. A commit correctly labelled
+`fix:` has already changed a property's type here, which is a major-or-minor
+event, not a patch. Once the surface settles after 1.0 that inference becomes
+safe, and the workflow can be replaced by release-please.
+
+The same steps are available locally if you ever need them:
+
+```bash
+php tools/release.php next minor      # what would the next version be
+php tools/release.php prepare 0.2.0   # rewrite CHANGELOG + the table below
+php tools/release.php notes 0.2.0     # print that section
+```
+
+`prepare` refuses to run twice for the same version, and refuses to run at all
+when `[Unreleased]` is empty — a release with nothing in it is a mistake.
+
+### Two things that will bite you
+
+**Branch protection.** The workflow pushes the release commit straight to the
+default branch. If that branch requires pull requests or status checks, the push
+is rejected. Either allow `github-actions[bot]` to bypass the rule, or give the
+workflow a PAT with push rights in place of the built-in token.
+
+**Packagist is notified by the workflow itself,** not by `release.yml`. A tag
+pushed with the built-in `GITHUB_TOKEN` does not trigger other workflows, so
+`release.yml`'s `on: push: tags` never fires for a release cut this way.
+`release.yml` remains the path for a tag pushed by hand from a laptop.
+
 ## SDK version ↔ API version compatibility
 
 Every real release adds a row, marked `Shipped` once it is actually published.
