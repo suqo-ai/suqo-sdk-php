@@ -9,9 +9,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      # Every version runs even when one fails: knowing it broke on the floor
+      # *and* the ceiling is a different diagnosis from knowing it broke on one.
       fail-fast: false
       matrix:
-        php: ['8.1', '8.2', '8.3', '8.4']
+        # This list must span composer.json's `"php": "^8.1"`, which resolves to
+        # >=8.1 <9.0 -- so 8.5 is a version the package promises to support, not
+        # an optional extra. The floor and the ceiling are the two rows that earn
+        # their keep: 8.1 catches syntax or functions newer than the package
+        # claims, 8.5 catches deprecations that have become errors. Widen
+        # `require` and this list widens with it.
+        php: ['8.1', '8.2', '8.3', '8.4', '8.5']
 
     steps:
       - uses: actions/checkout@v4
