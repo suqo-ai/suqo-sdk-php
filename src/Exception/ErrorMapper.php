@@ -35,6 +35,20 @@ final class ErrorMapper
         $classified = $c['message'];
 
         return match (true) {
+            $status >= 300 && $status < 400 => new SuqoError(
+                sprintf(
+                    'Unexpected redirect (%d). The SDK never follows redirects, because the '
+                    . 'Authorization header would follow with them. If an injected PSR-18 client '
+                    . 'is configured to follow redirects, the API key has already been sent to '
+                    . 'the redirect target.',
+                    $status,
+                ),
+                $status,
+                $requestId,
+                $body,
+                [],
+                $retryAfter,
+            ),
             $status === 401 => new AuthenticationError(
                 $classified ?? 'Authentication failed.',
                 $status,

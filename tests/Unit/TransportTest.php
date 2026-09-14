@@ -264,4 +264,51 @@ final class TransportTest extends TransportTestCase
 
         self::assertSame(0, $client->attempts());
     }
+
+    /**
+     * §6.5 — a 3xx is an error, not a payload.
+     *
+     * CurlHttpClient forces CURLOPT_FOLLOWLOCATION off, precisely because curl
+     * does not strip a manually-set Authorization header across a redirect. So a
+     * redirect arrives here intact, and without this it would be decoded as if
+     * its body were the response.
+     */
+    public function testRedirectStatusesAreRejectedRatherThanDecoded(): void
+    {
+        foreach ([301, 302, 307, 308] as $status) {
+            $client = (new MockHttpClient())->pushJson($status, ['results' => []]);
+
+            try {
+                $this->transport($client)->request('GET', Endpoints::PRODUCTS);
+                self::fail('Expected ' . $status . ' to be rejected.');
+            } catch (SuqoError $e) {
+                self::assertSame($status, $e->status);
+                self::assertStringContainsString('Unexpected redirect', $e->getMessage());
+            }
+        }
+    }
+
+    /** A redirect is not retried: it is a configuration fault, not a transient one. */
+    public function testARedirectIsNotRetried(): void
+    {
+        $client = (new MockHttpClient())->pushJson(302, null, times: 3);
+
+        try {
+            $this->transport($client, maxRetries: 2)->request('GET', Endpoints::PRODUCTS);
+        } catch (SuqoError) {
+            // expected
+        }
+
+        self::assertSame(1, $client->attempts());
+    }
+
+    public function testTwoHundredRangeStillSucceeds(): void
+    {
+        foreach ([200, 201, 202, 204] as $status) {
+            $client = (new MockHttpClient())->pushJson($status, []);
+            $response = $this->transport($client)->request('POST', Endpoints::SUBSCRIPTIONS, []);
+
+            self::assertSame($status, $response->status);
+        }
+    }
 }

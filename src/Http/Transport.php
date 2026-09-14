@@ -152,7 +152,12 @@ final class Transport
             'elapsed_ms' => $elapsedMs,
         ]);
 
-        if ($response->status >= 400) {
+        // §6.5 — 3xx included. No HTTP client the SDK drives follows redirects
+        // (CurlHttpClient forces CURLOPT_FOLLOWLOCATION off), so a 3xx arrives
+        // here intact and would otherwise be decoded as if it were the payload.
+        // It also surfaces an injected PSR-18 client configured not to follow
+        // them, which is the safe configuration but produces no usable body.
+        if ($response->status >= 300) {
             throw ErrorMapper::map(
                 $response->status,
                 $parsed,

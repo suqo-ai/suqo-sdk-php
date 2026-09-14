@@ -84,6 +84,67 @@ $suqo = new SuqoClient(httpClient: new CurlHttpClient([CURLOPT_PROXY => '…']))
 $suqo = new SuqoClient(httpClient: new Psr18HttpClient($client, $requestFactory, $streamFactory));
 ```
 
+### Every request carries your API key
+
+That one fact drives the three warnings below. `Authorization: Bearer <key>` is set
+on every request the SDK makes, so anything that changes *where* a request goes,
+or *who can read it*, is a question about your live credential.
+
+#### Redirects are never followed — do not re-enable them
+
+`CurlHttpClient` forces `CURLOPT_FOLLOWLOCATION` off, and it does so *after*
+merging your options, so passing `CURLOPT_FOLLOWLOCATION => true` has no effect.
+This is deliberate: **cURL does not strip a manually-set `Authorization` header
+when it follows a redirect**, so a `302` to another host would hand your live API
+key to that host — routing straight around the same-origin check the transport
+applies to pagination links.
+
+A redirect therefore reaches the transport intact, and is raised as a `SuqoError`
+carrying the 3xx status rather than being decoded as a response body.
+
+**If you inject a PSR-18 client, this guarantee is yours to keep.** `Psr18HttpClient`
+copies the headers onto a PSR-7 request and delegates; it cannot control your
+client's redirect policy, and several popular clients follow redirects by default.
+Turn that off:
+
+```php
+// Guzzle
+new \GuzzleHttp\Client(['allow_redirects' => false]);
+
+// Symfony HttpClient
+\Symfony\Component\HttpClient\HttpClient::create(['max_redirects' => 0]);
+```
+
+With redirects disabled you will see a `SuqoError` with a 3xx status if the API
+ever redirects — which is the outcome you want, because the alternative is a
+silently leaked key. If you leave them enabled and a redirect happens, the key has
+already been sent by the time the SDK sees anything.
+
+#### Do not disable TLS verification
+
+`CURLOPT_SSL_VERIFYPEER` and `CURLOPT_SSL_VERIFYHOST` are **not** among the options
+the SDK overrides, so a value you pass is honoured:
+
+```php
+// Never do this against a live key.
+new CurlHttpClient([CURLOPT_SSL_VERIFYPEER => false]);
+```
+
+That is a deliberate escape hatch — the same mechanism that lets you set
+`CURLOPT_PROXY` or a custom CA bundle — but it means the SDK will happily send
+your API key over a connection it has not authenticated. If you need a custom
+trust root, point at it rather than switching verification off:
+
+```php
+new CurlHttpClient([CURLOPT_CAINFO => '/path/to/ca-bundle.crt']);
+```
+
+#### Options you set are a base, not an override
+
+`CurlHttpClient` applies your array first, then writes the options it requires on
+top: the URL, method, headers, timeouts, body, and the redirect and progress
+settings. You can add to the request; you cannot change what the SDK depends on.
+
 ### `HttpClientInterface::send`
 
 ```php

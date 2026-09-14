@@ -37,6 +37,15 @@ project follows [Semantic Versioning](https://semver.org/) as described in
   match the configured base URL. Pagination follows server-supplied `next`
   links, and every request carries the API key, so an off-host link would have
   leaked it.
+- A 3xx response is now raised as a `SuqoError` carrying the redirect status,
+  rather than being decoded as if its body were the payload. The SDK never
+  follows redirects — cURL does not strip a manually-set `Authorization` header
+  across one — so a redirect reaching the transport is an error, and raising it
+  also surfaces an injected PSR-18 client that is safely configured not to
+  follow them.
+- `autoPaging()` stops after `Pagination::MAX_PAGES` (10 000) rather than
+  following a `next` chain forever. A link pointing back at its own page is
+  same-origin, so the origin guard does not catch it.
 
 ### Fixed
 

@@ -18,6 +18,8 @@ faults included.
     ├── CancelledError        caller cancelled (status 0)
     ├── NotImplementedError   unimplemented resource (status 0)
     └── SuqoConfigError       bad configuration, before any request exists
+
+A 3xx is raised as the base SuqoError carrying the redirect status -- see below.
 ```
 
 The `Error` suffix is kept rather than PHP's `Exception` idiom so type names read
@@ -139,6 +141,21 @@ A status the table above does not name — a `402`, say — also lands here, wit
 message `'Request failed with status %d.'`. That mirrors the TypeScript SDK's
 `default` arm, so the two bindings classify an unexpected status identically.
 Such a status is **not** retried: only a network failure, a 429 or a 5xx is.
+
+### A 3xx redirect — base `SuqoError`
+
+The SDK never follows redirects, because `Authorization` would follow with them
+(see [http.md](http.md#redirects-are-never-followed--do-not-re-enable-them)). A
+3xx therefore reaches the transport intact and is raised rather than decoded as
+if its body were the payload. `status` is the real redirect status.
+
+It is **not** retried: a redirect is a configuration or contract change, not a
+transient failure.
+
+Seeing one means either the API started redirecting a route the SDK calls, or an
+injected PSR-18 client is configured not to follow redirects — which is the safe
+configuration. If your PSR-18 client *does* follow redirects you will never see
+this, and the key will already have been sent to the target.
 
 ### `NetworkError` — status 0
 
