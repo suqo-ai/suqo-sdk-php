@@ -19,6 +19,17 @@ declare(strict_types=1);
  *   php tools/release.php notes <version>
  *       Print that version's CHANGELOG section, for a GitHub Release body.
  *
+ *   php tools/release.php suggest
+ *       Print the bump the commits since the last tag imply, or "none" when
+ *       nothing releasable has landed. A `Release-As: X.Y.Z` footer on any of
+ *       those commits wins outright and is printed verbatim.
+ *
+ *   php tools/release.php pending
+ *       Print the newest version in CHANGELOG that has no matching git tag --
+ *       i.e. a release that has been prepared and merged but not yet tagged.
+ *       Empty when there is none. Merge-strategy agnostic, so it works whether
+ *       the release PR was squashed, rebased or merged.
+ *
  * The version itself is never written into composer.json: the git tag is the
  * only source of truth (see VERSIONING.md). This script only touches prose.
  */
@@ -36,10 +47,14 @@ function main(array $argv): int
         'next' => cmdNext($argument),
         'prepare' => cmdPrepare($argument),
         'notes' => cmdNotes($argument),
+        'suggest' => cmdSuggest(),
+        'pending' => cmdPending(),
         default => fail(
             "usage: release.php next <patch|minor|major>\n"
             . "       release.php prepare <version>\n"
-            . "       release.php notes <version>"
+            . "       release.php notes <version>\n"
+            . "       release.php suggest\n"
+            . "       release.php pending"
         ),
     };
 }
@@ -191,6 +206,79 @@ function shipRow(string $versioning, string $version): string
     array_splice($lines, $lastRow + 1, 0, "| `{$version}` | `v1` | See CHANGELOG | Shipped |");
 
     return implode("\n", $lines);
+}
+
+/**
+ * The bump implied by the commits since the last tag.
+ *
+ * Conventional Commits cannot see every breaking change this SDK makes -- a
+ * widened property type or a reordered named argument can ship under `fix:`
+ * (VERSIONING.md) -- so this is a *suggestion*. A `Release-As: X.Y.Z` footer
+ * overrides it, and the release PR's version can be edited before merging.
+ */
+function cmdSuggest(): int
+{
+    $range = latestTag() === null ? 'HEAD' : 'v' . latestTag() . '..HEAD';
+
+    exec('git log --no-merges --format=%B ' . escapeshellarg($range), $lines, $status);
+
+    if ($status !== 0) {
+        return fail('Could not read the commit log.');
+    }
+
+    $log = implode("\n", $lines);
+
+    // An explicit footer wins: it is the escape hatch for a break the prefixes
+    // cannot express.
+    if (preg_match('/^Release-As:\s*v?(\d+\.\d+\.\d+)\s*$/mi', $log, $match) === 1) {
+        echo $match[1], PHP_EOL;
+
+        return 0;
+    }
+
+    $breaking = preg_match('/^BREAKING[ -]CHANGE:/mi', $log) === 1
+        || preg_match('/^[a-z]+(\([^)]*\))?!:/mi', $log) === 1;
+    $feature = preg_match('/^feat(\([^)]*\))?!?:/mi', $log) === 1;
+    $fix = preg_match('/^(fix|perf|refactor|revert)(\([^)]*\))?!?:/mi', $log) === 1;
+
+    $preMajor = (latestTag() === null) || str_starts_with(latestTag(), '0.');
+
+    // While under 1.0 the minor acts as the major (VERSIONING.md), so a breaking
+    // change bumps the minor rather than going straight to 1.0.0.
+    echo match (true) {
+        $breaking => $preMajor ? 'minor' : 'major',
+        $feature => $preMajor ? 'patch' : 'minor',
+        $fix => 'patch',
+        default => 'none',
+    }, PHP_EOL;
+
+    return 0;
+}
+
+/** A version prepared in CHANGELOG but not yet tagged, if any. */
+function cmdPending(): int
+{
+    $changelog = file_get_contents(CHANGELOG);
+
+    if ($changelog === false) {
+        return fail('Could not read CHANGELOG.md.');
+    }
+
+    if (preg_match('/^## \[(\d+\.\d+\.\d+)\]/m', $changelog, $match) !== 1) {
+        return 0;
+    }
+
+    $version = $match[1];
+
+    exec('git rev-parse -q --verify ' . escapeshellarg('refs/tags/v' . $version), $out, $status);
+
+    if ($status === 0) {
+        return 0;
+    }
+
+    echo $version, PHP_EOL;
+
+    return 0;
 }
 
 function cmdNotes(string $version): int

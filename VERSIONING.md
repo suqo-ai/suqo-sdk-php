@@ -63,37 +63,54 @@ only at the next major. Nothing is ever removed in a minor or a patch.
 
 ## Cutting a release
 
-Releases are cut by the **Tag release** workflow (Actions → *Tag release* → *Run
-workflow*), not by hand. Pick `patch`, `minor` or `major` — or type an exact
-version to override — and it will:
+Releases run on a train. **You never tag by hand, and you never edit a version
+string.**
 
-1. run the full gate against the chosen ref (`composer validate --strict`,
-   invariants, lint, PHPStan, tests);
-2. resolve the next version from the newest `v*` tag, refusing one that already
-   exists, because a published tag is never moved;
-3. move the CHANGELOG's `[Unreleased]` entries under a dated `## [X.Y.Z]`
-   heading and open a fresh empty `[Unreleased]`;
-4. mark the version `Shipped` in the table below, adding a row if it is absent;
-5. commit `chore(release): X.Y.Z`, create an annotated `vX.Y.Z` tag, push both;
-6. create the GitHub Release with that CHANGELOG section as its body;
-7. tell Packagist to index the new tag.
+1. You merge an ordinary PR into `main`.
+2. **Release train** runs and opens a single **Release PR** on the branch
+   `release/next`. It contains nothing but the `CHANGELOG.md` and
+   `VERSIONING.md` edits for the next version. It stays open and re-prepares
+   itself as further PRs land, so at any moment it shows exactly what the next
+   release would be.
+3. When you merge the Release PR, the train runs again, sees a version in the
+   CHANGELOG with no matching tag, and cuts the release: annotated tag, GitHub
+   Release with that CHANGELOG section as its body, and a Packagist update.
 
-Tick **dry run** to do steps 1–4 and print the diff without tagging. That is the
-safe way to check what a release would contain.
+Merging the Release PR is the release decision. Until you merge it, nothing is
+tagged and nothing is published.
 
-**The bump is your decision, deliberately.** It is not inferred from commit
-messages, because the breaking changes in this SDK are mostly invisible to a
-Conventional Commits prefix — see the table above. A commit correctly labelled
-`fix:` has already changed a property's type here, which is a major-or-minor
-event, not a patch. Once the surface settles after 1.0 that inference becomes
-safe, and the workflow can be replaced by release-please.
+Which path the train takes is decided by asking *"is there a prepared version
+with no tag?"*, not by pattern-matching a commit subject — so squash, rebase and
+merge commits all work.
 
-The same steps are available locally if you ever need them:
+### Choosing the version
+
+The train suggests a bump from the Conventional Commit prefixes since the last
+tag, using the pre-1.0 rules in this document: while under `1.0.0`, a breaking
+change bumps the **minor** and a `feat:` bumps the **patch**.
+
+**Treat that as a suggestion, not a verdict.** The prefixes cannot see every
+breaking change this SDK makes — the table above lists cases where widening a
+property type or reordering a named argument ships under `fix:`, and exactly
+that has already happened here. To override, put a footer on any commit on
+`main`:
+
+```
+Release-As: 0.2.0
+```
+
+The train picks it up and re-prepares the Release PR at that version.
+
+### Running the steps by hand
+
+The plumbing is a script, so nothing is locked inside the workflow:
 
 ```bash
-php tools/release.php next minor      # what would the next version be
+php tools/release.php suggest         # the bump the commits imply
+php tools/release.php next minor      # what that version would be
 php tools/release.php prepare 0.2.0   # rewrite CHANGELOG + the table below
 php tools/release.php notes 0.2.0     # print that section
+php tools/release.php pending         # a prepared version that is not tagged
 ```
 
 `prepare` refuses to run twice for the same version, and refuses to run at all
@@ -101,15 +118,21 @@ when `[Unreleased]` is empty — a release with nothing in it is a mistake.
 
 ### Two things that will bite you
 
-**Branch protection.** The workflow pushes the release commit straight to the
-default branch. If that branch requires pull requests or status checks, the push
-is rejected. Either allow `github-actions[bot]` to bypass the rule, or give the
-workflow a PAT with push rights in place of the built-in token.
+**A PR opened by the bot does not trigger `pull_request` workflows.** GitHub
+deliberately prevents that recursion for the built-in token. So CI will not run
+on the Release PR. That is usually fine, since it only touches two Markdown
+files — but if `main` requires status checks, the PR cannot be merged, because
+the checks never start. Either exempt `release/next`, or give the workflow a PAT
+instead of the built-in token so the PR is attributed to a user.
 
-**Packagist is notified by the workflow itself,** not by `release.yml`. A tag
-pushed with the built-in `GITHUB_TOKEN` does not trigger other workflows, so
-`release.yml`'s `on: push: tags` never fires for a release cut this way.
-`release.yml` remains the path for a tag pushed by hand from a laptop.
+Note that the train does **not** push commits to `main`; the release commit
+arrives through the PR you merge. Ordinary branch protection is therefore not a
+problem — only required status checks are.
+
+**Packagist is notified by the train,** not by `release.yml`. A tag pushed with
+the built-in token does not trigger other workflows, so `release.yml`'s
+`on: push: tags` never fires for a train release. `release.yml` remains the path
+for a tag pushed by hand from a laptop.
 
 ## SDK version ↔ API version compatibility
 
