@@ -4,7 +4,8 @@ Official PHP SDK for the [SUQO](https://suqo.ai) API. Implements **SUQO SDK —
 Specification v2.0**; binding decisions are recorded in [BINDING.md](BINDING.md).
 
 This page is the quick start. For a per-method reference — every parameter, return
-type and thrown exception — see **[docs/](docs/README.md)**.
+type and thrown exception — see **[docs/](https://suqo.ai/docs/sdk/php)**. For
+code you can run against your own sandbox, see **[examples/](examples/)**.
 
 Requires PHP 8.1+ with `ext-curl`, `ext-json` and `ext-hash`.
 
@@ -21,10 +22,10 @@ $suqo = new SuqoClient();                 // api key from $SUQO_API_KEY
 ```
 
 The environment is inferred from the key prefix — `su_test_key_` is sandbox,
-`su_key_` is live. Passing `environment:` is a *check*, never an override: it can
+`su_key_` is live. Passing `environment:` is a _check_, never an override: it can
 only agree with the prefix or raise `SuqoConfigError`.
 
-*Full reference: [docs/client.md](docs/client.md).*
+_Full reference: [docs/client.md](docs/client.md)._
 
 ```php
 $suqo = new SuqoClient(
@@ -38,7 +39,8 @@ $suqo = new SuqoClient(
 
 ## Products
 
-*Full reference: [docs/products.md](docs/products.md).*
+_Full reference: [docs/products.md](docs/products.md). Runnable:
+[examples/list_products.php](examples/list_products.php)._
 
 ```php
 $page = $suqo->products->list(page: 1, pageSize: 50);
@@ -78,7 +80,8 @@ foreach ($suqo->products->autoPaging() as $product) {
 
 ## Subscriptions
 
-*Full reference: [docs/subscriptions.md](docs/subscriptions.md).*
+_Full reference: [docs/subscriptions.md](docs/subscriptions.md). Runnable:
+[examples/create_subscription.php](examples/create_subscription.php)._
 
 ```php
 use Suqo\Params\CreateSubscriptionParams;
@@ -170,7 +173,7 @@ if ($status instanceof SubscriptionStatus) {
 
 Every monetary and decimal value — `price`, `vatPercentage`, `totalSubscribers`
 — is a `string`, end to end, and is never parsed into a float inside the SDK.
-`vat_percentage` arrives as a JSON *number* and is still surfaced as a string,
+`vat_percentage` arrives as a JSON _number_ and is still surfaced as a string,
 without ever being cast through a float type. Dates are strings for the same
 reason, and they carry microseconds and a `+05:45` offset rather than `Z`.
 
@@ -182,7 +185,7 @@ $total = bcmul($subscription->product->price, '2', 2);
 
 ## Errors
 
-*Full reference: [docs/errors.md](docs/errors.md).*
+_Full reference: [docs/errors.md](docs/errors.md)._
 
 Every SDK error derives from `Suqo\Exception\SuqoError` and carries `status`,
 `requestId`, `rawBody`, `fieldErrors` and `retryAfter`.
@@ -208,19 +211,19 @@ try {
 }
 ```
 
-| Type | Raised on |
-| --- | --- |
-| `AuthenticationError` | 401 |
-| `KycRequiredError` | 403 with a KYC-shaped body |
-| `PermissionDeniedError` | 403 without one — a plain authorization failure |
-| `ValidationError` | 400 |
-| `NotFoundError` | 404 |
-| `RateLimitError` | 429 |
-| `ServerError` | ≥ 500, and any status not mapped above |
-| `NetworkError` | transport failure, timeout, or a refused URL (status 0) |
-| `CancelledError` | caller cancelled (status 0) |
-| `NotImplementedError` | a resource exposed ahead of its operations (status 0) — currently unused |
-| `SuqoError` | the base type every one of the above derives from |
+| Type                    | Raised on                                                                |
+| ----------------------- | ------------------------------------------------------------------------ |
+| `AuthenticationError`   | 401                                                                      |
+| `KycRequiredError`      | 403 with a KYC-shaped body                                               |
+| `PermissionDeniedError` | 403 without one — a plain authorization failure                          |
+| `ValidationError`       | 400                                                                      |
+| `NotFoundError`         | 404                                                                      |
+| `RateLimitError`        | 429                                                                      |
+| `ServerError`           | ≥ 500, and any status not mapped above                                   |
+| `NetworkError`          | transport failure, timeout, or a refused URL (status 0)                  |
+| `CancelledError`        | caller cancelled (status 0)                                              |
+| `NotImplementedError`   | a resource exposed ahead of its operations (status 0) — currently unused |
+| `SuqoError`             | the base type every one of the above derives from                        |
 
 `SuqoConfigError extends SuqoError` and is raised during construction, before any
 request exists, so it carries no status, request id or body. A single
@@ -228,7 +231,7 @@ request exists, so it carries no status, request id or body. A single
 
 ## Retries
 
-*Full reference: [docs/http.md#retrypolicy](docs/http.md#retrypolicy).*
+_Full reference: [docs/http.md#retrypolicy](docs/http.md#retrypolicy)._
 
 `GET` requests are retried up to twice — three attempts total — on a network
 failure, a timeout, a 429 or a 5xx. Writes are not retried, pending idempotency
@@ -238,7 +241,7 @@ Absolute-URL page fetches take the same policy as page 1.
 
 ## Cancellation
 
-*Full reference: [docs/http.md#cancellation](docs/http.md#cancellation).*
+_Full reference: [docs/http.md#cancellation](docs/http.md#cancellation)._
 
 ```php
 use Suqo\Cancellation;
@@ -258,7 +261,8 @@ attempt, mid-flight, during backoff, and between pages.
 
 ## Webhooks
 
-*Full reference: [docs/webhooks.md](docs/webhooks.md).*
+_Full reference: [docs/webhooks.md](docs/webhooks.md). Runnable:
+[examples/webhook_handler.php](examples/webhook_handler.php)._
 
 Verification needs no client, no API key and no network — call it straight from a
 serverless handler. It never throws; every failure path returns `false`.
@@ -286,7 +290,7 @@ forward.
 
 ## Injecting an HTTP client
 
-*Full reference: [docs/http.md#injecting-a-client](docs/http.md#injecting-a-client).*
+_Full reference: [docs/http.md#injecting-a-client](docs/http.md#injecting-a-client)._
 
 ```php
 use Suqo\Http\CurlHttpClient;
@@ -304,7 +308,8 @@ transport handles everything else.
 
 ## Customers
 
-*Full reference: [docs/customers.md](docs/customers.md).*
+_Full reference: [docs/customers.md](docs/customers.md). Runnable:
+[examples/list_customers.php](examples/list_customers.php)._
 
 Read-only — a customer record is created implicitly the first time someone
 subscribes, through `subscriptions->create()`'s `customer` field.
@@ -327,17 +332,34 @@ openapi declares these operations, which this SDK does not expose. Each needs a
 specification revision first, because §14 forbids public surface the
 specification itself does not describe:
 
-| openapi operationId | Path |
-| --- | --- |
-| `subscriptions_read` | `GET /api/v1/subscriptions/{id}/` |
-| `subscriptions_resume` | `POST /api/v1/subscriptions/{id}/resume/` |
-| `customers_create` | `POST /api/v1/customers/` |
-| `customers_partial_update` | `PATCH /api/v1/customers/{id}/` |
-| `webhooks_*` | the eight `/api/v1/webhooks/…` operations |
+| openapi operationId        | Path                                      |
+| -------------------------- | ----------------------------------------- |
+| `subscriptions_read`       | `GET /api/v1/subscriptions/{id}/`         |
+| `subscriptions_resume`     | `POST /api/v1/subscriptions/{id}/resume/` |
+| `customers_create`         | `POST /api/v1/customers/`                 |
+| `customers_partial_update` | `PATCH /api/v1/customers/{id}/`           |
+| `webhooks_*`               | the eight `/api/v1/webhooks/…` operations |
 
-The Webhooks *management* resource is unexposed; `Suqo\Webhook::verify()` — which
+The Webhooks _management_ resource is unexposed; `Suqo\Webhook::verify()` — which
 verifies an inbound delivery and needs no network — is unrelated to it and is
 fully supported.
+
+## Examples
+
+Four runnable scripts in [examples/](examples/). Each takes the key from
+`$SUQO_API_KEY`, so none of them needs editing:
+
+| Script | What it shows |
+| --- | --- |
+| [list_products.php](examples/list_products.php) | Walks the catalogue and prints each plan's billing periods. **Run this first** — it is where `pbpId` comes from. |
+| [create_subscription.php](examples/create_subscription.php) | Creates a subscription from a `pbpId` and prints the `checkoutUrl` to send the buyer to. |
+| [list_customers.php](examples/list_customers.php) | Auto-pages the customer records, then reads one back by its public id. |
+| [webhook_handler.php](examples/webhook_handler.php) | A complete endpoint: verify the signature against the raw bytes, then acknowledge. |
+
+```bash
+SUQO_API_KEY=su_test_key_… php examples/list_products.php
+SUQO_API_KEY=su_test_key_… php examples/create_subscription.php pbp_3n9k2x
+```
 
 ## Playground
 
