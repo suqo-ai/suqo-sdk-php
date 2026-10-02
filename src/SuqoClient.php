@@ -9,9 +9,11 @@ use Suqo\Http\RetryPolicy;
 use Suqo\Http\Transport;
 use Suqo\Http\UrlBuilder;
 use Suqo\Logging\Logger;
+use Suqo\Resource\CheckoutSessions;
 use Suqo\Resource\Customers;
 use Suqo\Resource\Products;
 use Suqo\Resource\Subscriptions;
+use Suqo\Resource\Webhooks;
 
 /**
  * N9 — the client type, named for the vendor.
@@ -36,6 +38,15 @@ final class SuqoClient
     public readonly Subscriptions $subscriptions;
 
     public readonly Customers $customers;
+
+    public readonly CheckoutSessions $checkoutSessions;
+
+    /**
+     * Webhook *management* — registering and editing the endpoints SUQO
+     * delivers to. Verifying an inbound delivery is {@see Webhook::verify()},
+     * which needs no client at all.
+     */
+    public readonly Webhooks $webhooks;
 
     private readonly Transport $transport;
 
@@ -82,6 +93,8 @@ final class SuqoClient
         $this->products = new Products($this->transport);
         $this->subscriptions = new Subscriptions($this->transport);
         $this->customers = new Customers($this->transport);
+        $this->checkoutSessions = new CheckoutSessions($this->transport);
+        $this->webhooks = new Webhooks($this->transport);
     }
 
     /**

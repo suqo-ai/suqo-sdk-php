@@ -6,6 +6,8 @@ namespace Suqo\Tests\Unit;
 
 use ReflectionClass;
 use Suqo\Model\Customer;
+use Suqo\Params\CustomerCreateParams;
+use Suqo\Params\CustomerUpdateParams;
 use Suqo\Resource\Customers;
 use Suqo\Tests\Support\MockHttpClient;
 use Suqo\Tests\Support\TransportTestCase;
@@ -184,7 +186,8 @@ final class CustomersTest extends TransportTestCase
 
     /**
      * N4 — operation names come from the operationIds openapi declares:
-     * `customers_list` and `customers_read`, minus the resource noun.
+     * `customers_list`, `customers_read`, `customers_create` and
+     * `customers_partial_update`, minus the resource noun.
      */
     public function testTheOperationSetMatchesTheDeclaredOperationIds(): void
     {
@@ -198,6 +201,88 @@ final class CustomersTest extends TransportTestCase
 
         sort($declared);
 
-        self::assertSame(['autoPaging', 'list', 'read'], $declared);
+        self::assertSame(['autoPaging', 'create', 'list', 'read', 'update'], $declared);
+    }
+
+    public function testCreateSendsTheEmailAndOmitsUnsetFields(): void
+    {
+        $client = (new MockHttpClient())->pushJson(201, self::liveRecords()[0]);
+
+        $customer = (new Customers($this->transport($client)))->create(
+            new CustomerCreateParams(email: 'ram@example.com'),
+        );
+
+        self::assertSame('cus_0390b1820', $customer->id);
+        self::assertSame('POST', $client->lastRequest()->method);
+        self::assertStringContainsString('/api/v1/customers/', $client->lastRequest()->url);
+        self::assertSame(['email' => 'ram@example.com'], self::decodeBody($client));
+    }
+
+    public function testCreateSendsEveryFieldItWasGiven(): void
+    {
+        $client = (new MockHttpClient())->pushJson(201, self::liveRecords()[0]);
+
+        (new Customers($this->transport($client)))->create(new CustomerCreateParams(
+            email: 'ram@example.com',
+            phone: '9810000001',
+            fullName: 'Ram Bahadur',
+            address: 'Kathmandu, Nepal',
+        ));
+
+        self::assertSame([
+            'email' => 'ram@example.com',
+            'phone' => '9810000001',
+            'full_name' => 'Ram Bahadur',
+            'address' => 'Kathmandu, Nepal',
+        ], self::decodeBody($client));
+    }
+
+    /**
+     * The call is an upsert: a customer this account already holds is corrected
+     * and answered 200 rather than 201. Both decode the same way, which is what
+     * makes a retry safe.
+     */
+    public function testCreateDecodesA200TheSameWayAsA201(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::liveRecords()[0]);
+
+        $customer = (new Customers($this->transport($client)))->create(
+            new CustomerCreateParams(email: 'ram@example.com'),
+        );
+
+        self::assertSame('cus_0390b1820', $customer->id);
+    }
+
+    public function testUpdatePatchesOnlyTheFieldsThatWereSet(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::liveRecords()[0]);
+
+        (new Customers($this->transport($client)))->update(
+            'cus_0390b1820',
+            new CustomerUpdateParams(fullName: 'Ram Bahadur'),
+        );
+
+        self::assertSame('PATCH', $client->lastRequest()->method);
+        self::assertStringContainsString('/api/v1/customers/cus_0390b1820/', $client->lastRequest()->url);
+        self::assertSame(['full_name' => 'Ram Bahadur'], self::decodeBody($client));
+    }
+
+    /** Null leaves a field alone; `''` clears it. The two must stay distinct. */
+    public function testUpdateSendsAnEmptyStringToClearAField(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::liveRecords()[0]);
+
+        (new Customers($this->transport($client)))->update(
+            'cus_0390b1820',
+            new CustomerUpdateParams(address: ''),
+        );
+
+        self::assertSame(['address' => ''], self::decodeBody($client));
+    }
+
+    /** The body actually sent, decoded. Mirrors how the other suites read it. */
+    private static function decodeBody(MockHttpClient $client): mixed
+    {
+        return json_decode((string) $client->lastRequest()->body, true);
     }
 }
