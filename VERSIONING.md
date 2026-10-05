@@ -174,6 +174,7 @@ Every real release adds a row, marked `Shipped` once it is actually published.
 | --- | --- | --- | --- |
 | `0.1.0` | `v1` | Initial release | Shipped |
 | `1.0.0` | `v1` | Stability promotion | Shipped |
+| `1.1.0` | `v1` | See CHANGELOG | Shipped |
 
 ## Stability, from 1.0.0
 
