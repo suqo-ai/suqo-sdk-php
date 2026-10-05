@@ -454,9 +454,8 @@ SUQO_API_KEY=su_test_key_… php examples/manage_webhooks.php https://example.co
 
 ## Playground
 
-A local web app that drives the products, subscriptions, customers and webhook
-flows, with the API key typed into its homepage — no file in this project needs
-editing to switch keys or environments.
+A local web app that drives every operation, with the API key typed into its
+homepage — no file in this project needs editing to switch keys or environments.
 
 ```bash
 composer playground        # http://127.0.0.1:8000

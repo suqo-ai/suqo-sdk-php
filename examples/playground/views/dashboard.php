@@ -29,9 +29,11 @@ declare(strict_types=1);
     <table>
         <tr><th>Page</th><th>SDK call</th></tr>
         <tr><td><a href="/products">Products</a></td><td class="num">products-&gt;list() / products-&gt;autoPaging()</td></tr>
-        <tr><td><a href="/subscriptions">Subscriptions</a></td><td class="num">subscriptions-&gt;list() / cancel() / updateBillingCycle()</td></tr>
+        <tr><td><a href="/subscriptions">Subscriptions</a></td><td class="num">subscriptions-&gt;list() / read() / cancel() / resume() / renew() / updateBillingCycle()</td></tr>
         <tr><td><a href="/subscriptions/new">Create</a></td><td class="num">subscriptions-&gt;create()</td></tr>
-        <tr><td><a href="/customers">Customers</a></td><td class="num">customers-&gt;list()</td></tr>
-        <tr><td><a href="/webhook">Webhooks</a></td><td class="num">Webhook::verify() — no client, no key</td></tr>
+        <tr><td><a href="/checkout">Checkout</a></td><td class="num">checkoutSessions-&gt;create() / read()</td></tr>
+        <tr><td><a href="/customers">Customers</a></td><td class="num">customers-&gt;list() / create() / update()</td></tr>
+        <tr><td><a href="/endpoints">Endpoints</a></td><td class="num">webhooks-&gt;list() / create() / update() / delete() / secret() / testDelivery()</td></tr>
+        <tr><td><a href="/webhook">Verify</a></td><td class="num">Webhook::verify() — no client, no key</td></tr>
     </table>
 </div>

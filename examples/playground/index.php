@@ -18,11 +18,18 @@ require __DIR__ . '/bootstrap.php';
 
 use Suqo\Config;
 use Suqo\Exception\SuqoConfigError;
+use Suqo\Model\WebhookEvent;
+use Suqo\Params\CheckoutItem;
+use Suqo\Params\CreateCheckoutSessionParams;
 use Suqo\Params\CreateSubscriptionParams;
 use Suqo\Params\CustomerBilling;
+use Suqo\Params\CustomerCreateParams;
 use Suqo\Params\CustomerInput;
 use Suqo\Params\CustomerShipping;
+use Suqo\Params\CustomerUpdateParams;
 use Suqo\Params\UpdateBillingCycleParams;
+use Suqo\Params\WebhookParams;
+use Suqo\Params\WebhookUpdateParams;
 use Suqo\SuqoClient;
 use Suqo\Webhook;
 
@@ -261,14 +268,319 @@ switch ($route) {
 
         redirect('/subscriptions');
 
+    case 'GET /subscriptions/view':
+        $id = query('id');
+
+        if ($id === null) {
+            flash('error', 'A subscription id is required.');
+            redirect('/subscriptions');
+        }
+
+        [$subscription, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->subscriptions->read($id));
+
+        view('subscription', ['subscription' => $subscription, 'error' => $error, 'id' => $id]);
+
+        // no break — view() exits.
+
+    case 'POST /subscriptions/resume':
+        assertCsrf();
+
+        $id = post('subscription_id');
+
+        if ($id === null) {
+            flash('error', 'A subscription id is required.');
+            redirect('/subscriptions');
+        }
+
+        [$result, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->subscriptions->resume($id));
+
+        if ($error !== null) {
+            // An illegal transition answers 400 with a bare list of messages,
+            // which the mapper surfaces as the error message.
+            flash('error', describeError($error));
+        } elseif ($result !== null) {
+            flash('ok', $result->message);
+        }
+
+        redirect('/subscriptions');
+
+    case 'POST /subscriptions/renew':
+        assertCsrf();
+
+        $id = post('subscription_id');
+
+        if ($id === null) {
+            flash('error', 'A subscription id is required.');
+            redirect('/subscriptions');
+        }
+
+        [$session, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->subscriptions->renew($id));
+
+        if ($error !== null) {
+            flash('error', describeError($error));
+            redirect('/subscriptions');
+        }
+
+        flash('ok', sprintf(
+            'Renewal session %s opened — send the buyer to %s',
+            $session?->publicId ?? '-',
+            $session?->checkoutUrl ?? '-',
+        ));
+        redirect('/checkout?id=' . urlencode($session?->publicId ?? ''));
+
     case 'GET /customers':
-        // §10.3 — the resource exists, every operation refuses. Shown so the
-        // behaviour is visible rather than surprising.
         [$page, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->customers->list());
 
         view('customers', ['page' => $page, 'error' => $error]);
 
         // no break — view() exits.
+
+    case 'POST /customers':
+        assertCsrf();
+
+        $email = post('email');
+
+        if ($email === null) {
+            flash('error', 'An email is required: it identifies the buyer.');
+            redirect('/customers');
+        }
+
+        $params = new CustomerCreateParams(
+            email: $email,
+            phone: post('phone'),
+            fullName: post('full_name'),
+            address: post('address'),
+        );
+
+        [$customer, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->customers->create($params));
+
+        if ($error !== null) {
+            flash('error', describeError($error));
+        } elseif ($customer !== null) {
+            // An email or phone already on the account is corrected and answered
+            // 200 rather than 201 — the upsert that makes a retry safe.
+            flash('ok', sprintf('Recorded %s (%s).', $customer->id ?? '-', $customer->buyerEmail ?? '-'));
+        }
+
+        redirect('/customers');
+
+    case 'POST /customers/update':
+        assertCsrf();
+
+        $id = post('customer_id');
+
+        if ($id === null) {
+            flash('error', 'A customer id (cus_…) is required.');
+            redirect('/customers');
+        }
+
+        // '' is a real value here — it clears the field — so the blank-to-null
+        // helper is bypassed deliberately for the clearable fields.
+        $clearable = static function (string $name): ?string {
+            $value = $_POST[$name] ?? null;
+
+            return is_string($value) && trim($value) !== '' ? trim($value) : null;
+        };
+
+        $clear = $_POST['clear'] ?? [];
+        $clear = is_array($clear) ? $clear : [];
+
+        $params = new CustomerUpdateParams(
+            fullName: in_array('full_name', $clear, true) ? '' : $clearable('full_name'),
+            email: $clearable('email'),
+            address: in_array('address', $clear, true) ? '' : $clearable('address'),
+        );
+
+        [$customer, $error] = attempt(
+            static fn (SuqoClient $suqo) => $suqo->customers->update($id, $params),
+        );
+
+        if ($error !== null) {
+            flash('error', describeError($error));
+        } elseif ($customer !== null) {
+            flash('ok', sprintf('Updated %s. Body sent: %s', $customer->id ?? '-', json_encode($params->toWire())));
+        }
+
+        redirect('/customers');
+
+    case 'GET /checkout':
+        $id = query('id');
+        $detail = null;
+        $error = null;
+
+        if ($id !== null) {
+            [$detail, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->checkoutSessions->read($id));
+        }
+
+        view('checkout', ['session' => null, 'detail' => $detail, 'error' => $error, 'sent' => null, 'id' => $id]);
+
+        // no break — view() exits.
+
+    case 'POST /checkout':
+        assertCsrf();
+
+        $items = [];
+        $pbpId = post('pbp_id');
+
+        if ($pbpId !== null) {
+            $items[] = CheckoutItem::billingPeriod($pbpId);
+        }
+
+        $inlineName = post('item_name');
+        $inlineAmount = post('item_amount');
+
+        if ($inlineName !== null && $inlineAmount !== null) {
+            $items[] = CheckoutItem::inline(
+                name: $inlineName,
+                amount: $inlineAmount,
+                intervalType: post('item_interval_type') ?? 'one_time',
+                intervalCount: (int) (post('item_interval_count') ?? '0'),
+                discountAmount: post('item_discount_amount'),
+            );
+        }
+
+        $returnUrl = post('return_url');
+
+        if ($items === [] || $returnUrl === null) {
+            flash('error', 'At least one item and a return_url are required.');
+            redirect('/checkout');
+        }
+
+        $params = new CreateCheckoutSessionParams(
+            items: $items,
+            returnUrl: $returnUrl,
+            customerId: post('customer_id'),
+        );
+
+        [$session, $error] = attempt(
+            static fn (SuqoClient $suqo) => $suqo->checkoutSessions->create($params),
+        );
+
+        $detail = null;
+
+        if ($session !== null && $session->publicId !== null) {
+            // Read it straight back: a session is servable only while it is open.
+            [$detail] = attempt(
+                static fn (SuqoClient $suqo) => $suqo->checkoutSessions->read((string) $session->publicId),
+            );
+        }
+
+        view('checkout', [
+            'session' => $session,
+            'detail' => $detail,
+            'error' => $error,
+            'sent' => $params->toWire(),
+            'id' => $session?->publicId,
+        ]);
+
+        // no break — view() exits.
+
+    case 'GET /endpoints':
+        [$webhooks, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->webhooks->list());
+        [$secret] = attempt(static fn (SuqoClient $suqo) => $suqo->webhooks->secret());
+
+        view('endpoints', ['webhooks' => $webhooks ?? [], 'secret' => $secret, 'error' => $error]);
+
+        // no break — view() exits.
+
+    case 'POST /endpoints':
+        assertCsrf();
+
+        $event = post('event');
+        $endpointUrl = post('endpoint_url');
+
+        if ($event === null || $endpointUrl === null) {
+            flash('error', 'An event and an https endpoint URL are both required.');
+            redirect('/endpoints');
+        }
+
+        $params = new WebhookParams(
+            event: WebhookEvent::parse($event) ?? $event,
+            endpointUrl: $endpointUrl,
+        );
+
+        [$webhook, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->webhooks->create($params));
+
+        if ($error !== null) {
+            // https only, must resolve, and must resolve only to public
+            // addresses — localhost and a split-horizon host are both refused.
+            flash('error', describeError($error));
+        } elseif ($webhook !== null) {
+            flash('ok', sprintf('Registered %s for %s.', $webhook->id ?? '-', $endpointUrl));
+        }
+
+        redirect('/endpoints');
+
+    case 'POST /endpoints/toggle':
+        assertCsrf();
+
+        $id = post('webhook_id');
+        $active = post('is_active') === '1';
+
+        if ($id === null) {
+            flash('error', 'A webhook id (whk_…) is required.');
+            redirect('/endpoints');
+        }
+
+        // The whole body is {"is_active": …}: PATCH sends only what was set.
+        $params = new WebhookUpdateParams(isActive: $active);
+
+        [$webhook, $error] = attempt(
+            static fn (SuqoClient $suqo) => $suqo->webhooks->update($id, $params),
+        );
+
+        if ($error !== null) {
+            flash('error', describeError($error));
+        } elseif ($webhook !== null) {
+            flash('ok', sprintf('%s is now %s.', $webhook->id ?? '-', ($webhook->isActive ?? false) ? 'active' : 'paused'));
+        }
+
+        redirect('/endpoints');
+
+    case 'POST /endpoints/test':
+        assertCsrf();
+
+        $id = post('webhook_id');
+
+        if ($id === null) {
+            flash('error', 'A webhook id (whk_…) is required.');
+            redirect('/endpoints');
+        }
+
+        [$result, $error] = attempt(static fn (SuqoClient $suqo) => $suqo->webhooks->testDelivery($id));
+
+        if ($error !== null) {
+            flash('error', describeError($error));
+        } elseif ($result !== null) {
+            // 202 means queued, not delivered.
+            flash('ok', $result->detail);
+        }
+
+        redirect('/endpoints');
+
+    case 'POST /endpoints/delete':
+        assertCsrf();
+
+        $id = post('webhook_id');
+
+        if ($id === null) {
+            flash('error', 'A webhook id (whk_…) is required.');
+            redirect('/endpoints');
+        }
+
+        [, $error] = attempt(static function (SuqoClient $suqo) use ($id): bool {
+            $suqo->webhooks->delete($id);
+
+            return true;
+        });
+
+        if ($error !== null) {
+            flash('error', describeError($error));
+        } else {
+            flash('ok', sprintf('Deleted %s. Past delivery records are kept.', $id));
+        }
+
+        redirect('/endpoints');
 
     case 'GET /webhook':
         view('webhook', ['verified' => null, 'input' => []]);

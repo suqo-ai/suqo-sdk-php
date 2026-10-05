@@ -10,8 +10,10 @@ $nav = [
     '/products' => 'Products',
     '/subscriptions' => 'Subscriptions',
     '/subscriptions/new' => 'Create',
+    '/checkout' => 'Checkout',
     '/customers' => 'Customers',
-    '/webhook' => 'Webhooks',
+    '/endpoints' => 'Endpoints',
+    '/webhook' => 'Verify',
 ];
 
 $current = rtrim(parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/', '/');
