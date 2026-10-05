@@ -8,7 +8,54 @@ project follows [Semantic Versioning](https://semver.org/) as described in
 
 ## [Unreleased]
 
-<!-- Release-As: 1.0.0 -->
+<!-- Release-As: 1.1.0 -->
+
+### Added
+
+Full parity with the current `/api/v1` document. Every operation openapi
+declares is now exposed, so the README's *Not yet exposed* table is gone. All of
+it is additive: no existing class, method, property type or exception parent
+moves.
+
+- `checkoutSessions->create()` / `->read()` — a checkout session collects one
+  payment for up to ten billing periods, or for lines you price yourself. Adds
+  `CheckoutSession`, `CheckoutSessionDetail`, `CheckoutSeller`,
+  `CreateCheckoutSessionParams` and `CheckoutItem`, whose two named
+  constructors — `billingPeriod()` and `inline()` — make the API's mutually
+  exclusive item shapes unrepresentable rather than a 400 found at runtime.
+  `create` is the one rate-limited endpoint (20/min); being a write, it is not
+  retried for you.
+- `subscriptions->renew()` — opens a checkout session for the next payment on an
+  existing subscription, reusing its customer and billing period. Note the
+  API's singular `/subscription/renew/` path.
+- `subscriptions->read()` and `->resume()`.
+- `customers->create()` and `->update()`. `create` is an upsert: an email or
+  phone already on the account is corrected and answered 200 rather than 201,
+  which is what makes it safe to retry. Adds `CustomerCreateParams` and
+  `CustomerUpdateParams`, which keep `null` (leave the field alone) distinct
+  from `''` (clear it).
+- `$suqo->webhooks` — the eight management operations: `list`, `create`, `read`,
+  `replace` (PUT), `update` (PATCH), `delete`, `secret` and `testDelivery`.
+  Adds `WebhookEndpoint`, `WebhookEvent`, `SigningSecret`, `DetailResponse`,
+  `WebhookParams` and `WebhookUpdateParams`. This is unrelated to
+  `Webhook::verify()`, which still needs no client and no network; the two meet
+  at `secret()`. `list` is the API's one unpaginated collection — a bare array.
+- `Suqo\IntervalType` — the `day`/`week`/`month`/`year`/`one_time` enum, with
+  the same tolerant `parse()` as `SubscriptionStatus`. `BillingPeriod::$intervalType`
+  stays a `?string`; retyping a published property would be breaking.
+- `Wire::arr()` and `Wire::nflexbool()` — `line_items` is kept exactly as it
+  arrives, and `is_expired`, which openapi types as a string, decodes from
+  either spelling.
+
+### Changed
+
+- `Endpoints` gained the new routes and interpolators; every URL literal still
+  lives there alone (I4).
+- Documentation: a new `docs/checkout-sessions.md`, a management half to
+  `docs/webhooks.md`, and three new runnable examples —
+  `checkout_session.php`, `manage_subscription.php`, `manage_webhooks.php`.
+
+## [1.0.0] - 2026-09-14
 
 ### Changed
 
@@ -109,5 +156,6 @@ dated version heading automatically, so add new ones under `## [Unreleased]` and
 leave the rest alone.
 
 [Unreleased]: https://github.com/Code-Pros-AI/sdk-php/commits/main
+[1.0.0]: https://github.com/Code-Pros-AI/sdk-php/releases/tag/v1.0.0
 [0.1.0]: https://github.com/Code-Pros-AI/sdk-php/releases/tag/v0.1.0
 

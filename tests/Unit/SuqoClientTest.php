@@ -10,9 +10,11 @@ use Suqo\Exception\SuqoConfigError;
 use Suqo\LogLevel;
 use Suqo\Model\SubscriptionStatus;
 use Suqo\Params\UpdateBillingCycleParams;
+use Suqo\Resource\CheckoutSessions;
 use Suqo\Resource\Customers;
 use Suqo\Resource\Products;
 use Suqo\Resource\Subscriptions;
+use Suqo\Resource\Webhooks;
 use Suqo\SuqoClient;
 use Suqo\Tests\Support\MockHttpClient;
 use Suqo\Tests\Support\TransportTestCase;
@@ -29,6 +31,8 @@ final class SuqoClientTest extends TransportTestCase
         self::assertInstanceOf(Products::class, $suqo->products);
         self::assertInstanceOf(Subscriptions::class, $suqo->subscriptions);
         self::assertInstanceOf(Customers::class, $suqo->customers);
+        self::assertInstanceOf(CheckoutSessions::class, $suqo->checkoutSessions);
+        self::assertInstanceOf(Webhooks::class, $suqo->webhooks);
     }
 
     public function testTheSandboxBaseUrlIsUsedEndToEnd(): void

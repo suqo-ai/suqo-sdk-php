@@ -180,6 +180,54 @@ final class Wire
         return $out;
     }
 
+    /**
+     * A wire value that is any array — a JSON object or a JSON array — kept as
+     * it arrived. Used where openapi declares a container without describing its
+     * members, so the SDK has nothing to type but must not drop the payload.
+     *
+     * @param  array<string, mixed> $wire
+     * @return array<mixed>
+     */
+    public static function arr(array $wire, string $key): array
+    {
+        $value = $wire[$key] ?? null;
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * A boolean that the API may spell as a string.
+     *
+     * {@see self::nbool()} is the strict reader and stays the default. This one
+     * exists for `is_expired` on a checkout session, which openapi declares as a
+     * string, and accepts `true`/`"true"`/`1`/`"1"` and their falsy twins.
+     * Anything else reads as absent.
+     *
+     * @param array<string, mixed> $wire
+     */
+    public static function nflexbool(array $wire, string $key): ?bool
+    {
+        $value = $wire[$key] ?? null;
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) && ($value === 0 || $value === 1)) {
+            return $value === 1;
+        }
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        return match (strtolower(trim($value))) {
+            'true', '1' => true,
+            'false', '0' => false,
+            default => null,
+        };
+    }
+
     private function __construct()
     {
     }

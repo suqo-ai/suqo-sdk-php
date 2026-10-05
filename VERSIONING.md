@@ -173,6 +173,7 @@ Every real release adds a row, marked `Shipped` once it is actually published.
 | SDK version | Supported API version | Change type | Status |
 | --- | --- | --- | --- |
 | `0.1.0` | `v1` | Initial release | Shipped |
+| `1.0.0` | `v1` | Stability promotion | Shipped |
 
 ## Stability, from 1.0.0
 
@@ -182,10 +183,12 @@ version. Concretely, from that release onwards:
 - A breaking change — anything in the table above marked *yes* — requires a
   **MAJOR** bump, and is announced one minor in advance wherever the change can
   be deprecated rather than simply made.
-- The operations openapi declares but this SDK does not yet expose
-  (`subscriptions_read`, `subscriptions_resume`, the Customers write operations,
-  the Webhooks management resource) are **additive**. Each lands as a **MINOR**,
-  never a major, because adding a method breaks nobody.
+- Adding an operation is **additive**: it lands as a **MINOR**, never a major,
+  because adding a method breaks nobody. `1.1.0` is the first instance —
+  `subscriptions_read`, `subscriptions_resume`, the Customers write operations
+  and the Webhooks management resource shipped there, alongside the checkout
+  sessions and renew operations the API added. The SDK now exposes every
+  operation openapi declares.
 - `0.1.0` and `1.0.0` are the same code. The promotion is a statement about
   stability, not a change in behaviour.
 

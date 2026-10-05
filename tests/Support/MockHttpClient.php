@@ -43,8 +43,9 @@ final class MockHttpClient implements HttpClientInterface
     }
 
     /**
-     * @param  array<string, mixed>|string|null $body
-     * @param  array<string, string>            $headers
+     * @param  array<mixed>|string|null $body A wire object, or — as the webhooks
+     *         list answers with — a bare JSON array.
+     * @param  array<string, string>    $headers
      * @return $this
      */
     public function pushJson(int $status, array|string|null $body = null, array $headers = [], int $times = 1): self

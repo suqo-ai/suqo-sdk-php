@@ -1,6 +1,6 @@
 # SUQO PHP SDK playground
 
-A small local web app that drives the SDK. The API key is typed into the
+A small local web app that drives every operation the SDK exposes. The API key is typed into the
 homepage — nothing in this project has to be edited to change keys, environments,
 timeouts or retry counts.
 
@@ -31,9 +31,12 @@ Stop it with Ctrl-C. Pick a different port by editing the command, not the code.
 | **Overview** (`/`) | resolved config; `products->list(pageSize: 1)` as a connectivity check |
 | **Products** (`/products`) | `products->list()` page by page, and `products->autoPaging()` walking every page lazily |
 | **Subscriptions** (`/subscriptions`) | `subscriptions->list()`, `cancel()`, `updateBillingCycle()`; status counts; the `client` → `customer` rename |
+| **Subscription** (`/subscriptions/view?id=…`) | `subscriptions->read()`, and `cancel()` / `resume()` / `renew()` on that one record |
 | **Create** (`/subscriptions/new`) | `subscriptions->create()`, showing the exact request body that went out |
-| **Customers** (`/customers`) | `customers->list()` — the read-only customer records, with nulls shown as nulls |
-| **Webhooks** (`/webhook`) | `Webhook::verify()` — no client, no key, no network. "Sign it for me" produces a valid signature so the page is demonstrable without a real delivery |
+| **Checkout** (`/checkout`) | `checkoutSessions->create()` with either item shape, then `read()` straight back. The one rate-limited endpoint |
+| **Customers** (`/customers`) | `customers->list()`, `create()` (an upsert) and `update()`, with `null` vs `""` as a checkbox |
+| **Endpoints** (`/endpoints`) | `webhooks->list()`, `create()`, `update()`, `delete()`, `secret()`, `testDelivery()` — webhook *management* |
+| **Verify** (`/webhook`) | `Webhook::verify()` — no client, no key, no network. "Sign it for me" produces a valid signature so the page is demonstrable without a real delivery |
 
 Errors are rendered rather than thrown: type, HTTP status, request id, field errors,
 `kycStatus` where applicable, `retryAfter` where the server sent one, and the raw

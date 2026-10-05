@@ -13,8 +13,9 @@ Everything is namespaced under `Suqo\`, PSR-4 from `src/`.
 | [client.md](client.md) | `SuqoClient`, `Config`, `Environment`, `LogLevel` |
 | [products.md](products.md) | `Resource\Products` |
 | [subscriptions.md](subscriptions.md) | `Resource\Subscriptions` |
-| [customers.md](customers.md) | `Resource\Customers` — `list`, `autoPaging`, `read` (read-only) |
-| [webhooks.md](webhooks.md) | `Webhook::verify`, `SuqoClient::verifyWebhook` |
+| [customers.md](customers.md) | `Resource\Customers` — `list`, `autoPaging`, `read`, `create`, `update` |
+| [checkout-sessions.md](checkout-sessions.md) | `Resource\CheckoutSessions` — `create`, `read` |
+| [webhooks.md](webhooks.md) | `Webhook::verify`, `SuqoClient::verifyWebhook`, and `Resource\Webhooks` — the eight management operations |
 | [errors.md](errors.md) | the exception hierarchy, error fields, `ErrorMapper` |
 | [models.md](models.md) | response models, params objects, `SubscriptionStatus` |
 | [http.md](http.md) | the HTTP layer, retries, pagination, cancellation, logging |
@@ -31,12 +32,27 @@ Everything callable, in one table.
 | `$suqo->products->autoPaging(…)` | `Generator<int, Product>` | [products](products.md#autopaging) |
 | `$suqo->subscriptions->list(…)` | `SubscriptionPage` | [subscriptions](subscriptions.md#list) |
 | `$suqo->subscriptions->autoPaging(…)` | `Generator<int, Subscription>` | [subscriptions](subscriptions.md#autopaging) |
+| `$suqo->subscriptions->read(…)` | `Subscription` | [subscriptions](subscriptions.md#read) |
 | `$suqo->subscriptions->create(…)` | `CreateSubscriptionResponse` | [subscriptions](subscriptions.md#create) |
 | `$suqo->subscriptions->cancel(…)` | `MessageResponse` | [subscriptions](subscriptions.md#cancel) |
+| `$suqo->subscriptions->resume(…)` | `MessageResponse` | [subscriptions](subscriptions.md#resume) |
+| `$suqo->subscriptions->renew(…)` | `CheckoutSession` | [subscriptions](subscriptions.md#renew) |
 | `$suqo->subscriptions->updateBillingCycle(…)` | `MessageResponse` | [subscriptions](subscriptions.md#updatebillingcycle) |
 | `$suqo->customers->list(…)` | `Page<Customer>` | [customers](customers.md#list) |
 | `$suqo->customers->autoPaging(…)` | `Generator<int, Customer>` | [customers](customers.md#autopaging) |
 | `$suqo->customers->read(…)` | `Customer` | [customers](customers.md#read) |
+| `$suqo->customers->create(…)` | `Customer` | [customers](customers.md#create) |
+| `$suqo->customers->update(…)` | `Customer` | [customers](customers.md#update) |
+| `$suqo->checkoutSessions->create(…)` | `CheckoutSession` | [checkout-sessions](checkout-sessions.md#create) |
+| `$suqo->checkoutSessions->read(…)` | `CheckoutSessionDetail` | [checkout-sessions](checkout-sessions.md#read) |
+| `$suqo->webhooks->list(…)` | `list<WebhookEndpoint>` | [webhooks](webhooks.md#list) |
+| `$suqo->webhooks->create(…)` | `WebhookEndpoint` | [webhooks](webhooks.md#create) |
+| `$suqo->webhooks->read(…)` | `WebhookEndpoint` | [webhooks](webhooks.md#read) |
+| `$suqo->webhooks->replace(…)` | `WebhookEndpoint` | [webhooks](webhooks.md#replace) |
+| `$suqo->webhooks->update(…)` | `WebhookEndpoint` | [webhooks](webhooks.md#update) |
+| `$suqo->webhooks->delete(…)` | `void` | [webhooks](webhooks.md#delete) |
+| `$suqo->webhooks->secret(…)` | `SigningSecret` | [webhooks](webhooks.md#secret) |
+| `$suqo->webhooks->testDelivery(…)` | `DetailResponse` | [webhooks](webhooks.md#testdelivery) |
 | `Webhook::verify(…)` | `bool` | [webhooks](webhooks.md#verify) |
 | `Config::resolve(…)` | `Config` | [client](client.md#configresolve) |
 | `Environment::baseUrl()` | `string` | [client](client.md#environmentbaseurl) |
@@ -46,6 +62,9 @@ Everything callable, in one table.
 | `SubscriptionPage::fromSubscriptionsWire(…)` | `SubscriptionPage` | [models](models.md#subscriptionpagefromsubscriptionswire) |
 | `<Record>::fromWire(…)` | that record | [models](models.md#record-models) |
 | `SubscriptionStatus::parse(…)` | `SubscriptionStatus\|string\|null` | [models](models.md#subscriptionstatusparse) |
+| `WebhookEvent::parse(…)` | `WebhookEvent\|string\|null` | [models](models.md#webhookevent) |
+| `IntervalType::parse(…)` | `IntervalType\|string\|null` | [models](models.md#intervaltype) |
+| `CheckoutItem::billingPeriod(…)` / `::inline(…)` | `CheckoutItem` | [models](models.md#checkoutitem) |
 | `<Params>::toWire()` / `::fromWire(…)` | `array` / that params object | [models](models.md#params-objects) |
 | `Cancellation::none()` / `->cancel()` / `->isCancelled()` | `Cancellation` / `void` / `bool` | [http](http.md#cancellation) |
 | `Pagination::autoPage(…)` | `Generator<int, T>` | [http](http.md#paginationautopage) |
@@ -56,7 +75,7 @@ Everything callable, in one table.
 | `HttpResponse::header(…)` | `?string` | [http](http.md#httpresponse) |
 | `TransportResponse::object()` | `array` | [http](http.md#transportresponse) |
 | `Logger::debug/info/warn/error()` / `->level()` | `void` / `LogLevel` | [http](http.md#logger) |
-| `Endpoints::subscriptionCancel(…)` | `string` | [http](http.md#endpoints) |
+| `Endpoints::subscriptionCancel(…)` and friends | `string` | [http](http.md#endpoints) |
 | `Constants::writesRetryable()` / `::msgEnvConflict()` | `bool` / `string` | [http](http.md#constants) |
 | `ErrorMapper::map(…)` | `SuqoError` | [errors](errors.md#errormappermap) |
 

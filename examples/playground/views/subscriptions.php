@@ -67,11 +67,24 @@ $results = $pageObject?->results ?? [];
                     <td class="num"><?= e($subscription->product?->price) ?> <?= e($subscription->product?->currency) ?></td>
                     <td class="num"><?= e($subscription->nextBillingCycle) ?></td>
                     <td>
-                        <form method="post" action="/subscriptions/cancel" onsubmit="return confirm('Cancel this subscription?')">
-                            <?= csrfField() ?>
-                            <input type="hidden" name="subscription_id" value="<?= e($subscription->subscriptionId) ?>">
-                            <button class="ghost" type="submit">Cancel</button>
-                        </form>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap">
+                            <a href="/subscriptions/view?id=<?= urlencode((string) $subscription->subscriptionId) ?>"><button class="ghost" type="button">Open</button></a>
+                            <form method="post" action="/subscriptions/cancel" onsubmit="return confirm('Cancel this subscription?')" style="width:auto">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="subscription_id" value="<?= e($subscription->subscriptionId) ?>">
+                                <button class="ghost" type="submit">Cancel</button>
+                            </form>
+                            <form method="post" action="/subscriptions/resume" style="width:auto">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="subscription_id" value="<?= e($subscription->subscriptionId) ?>">
+                                <button class="ghost" type="submit">Resume</button>
+                            </form>
+                            <form method="post" action="/subscriptions/renew" style="width:auto">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="subscription_id" value="<?= e($subscription->subscriptionId) ?>">
+                                <button class="ghost" type="submit">Renew</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
             <?php } ?>
@@ -111,16 +124,14 @@ $results = $pageObject?->results ?? [];
     </form>
 </div>
 
-<h2>Cancel by id</h2>
+<h2>By id</h2>
 <div class="panel">
-    <form method="post" action="/subscriptions/cancel">
-        <?= csrfField() ?>
-        <div class="row">
-            <div>
-                <label for="cancel_id">subscription_id</label>
-                <input id="cancel_id" name="subscription_id" required placeholder="3fa85f64-…">
-            </div>
+    <form class="inline" method="get" action="/subscriptions/view">
+        <div style="flex:1">
+            <label for="open_id">subscription_id</label>
+            <input id="open_id" name="id" required placeholder="3fa85f64-…">
         </div>
-        <div class="actions"><button type="submit">Cancel subscription</button></div>
+        <button type="submit">Open</button>
     </form>
+    <p class="muted" style="margin-bottom:0">Cancel, resume and renew live on that page. Cancellation is scheduled for the end of the current period and resume undoes it until then; both are safe to repeat. Renew opens a checkout session for the next payment on the same customer and billing period.</p>
 </div>

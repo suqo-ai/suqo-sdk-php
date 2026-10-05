@@ -139,13 +139,28 @@ foreach ($page->results as $subscription) {
     echo '  billed to ', $subscription->customer?->billing?->businessName, PHP_EOL;
 }
 
+$subscription = $suqo->subscriptions->read('3fa85f64-5717-4562-b3fc-2c963f66afa6');
+
+// Cancellation is scheduled for the end of the current period, and resume
+// undoes it until then. Both are safe to repeat.
 $suqo->subscriptions->cancel('3fa85f64-5717-4562-b3fc-2c963f66afa6');
+$suqo->subscriptions->resume('3fa85f64-5717-4562-b3fc-2c963f66afa6');
+
+// Collect the next payment: a fresh checkout session on the same customer and
+// billing period.
+$session = $suqo->subscriptions->renew('3fa85f64-5717-4562-b3fc-2c963f66afa6');
+echo $session->checkoutUrl, PHP_EOL;
 
 $suqo->subscriptions->updateBillingCycle(new UpdateBillingCycleParams(
     subscriptionId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
     nextBillingCycle: '2026-09-03',        // a date, kept as a string
 ));
 ```
+
+Nothing on a subscription says whether it is recurring. Match
+`$subscription->product?->pbpId` against the catalogue and read that billing
+period's `intervalType`: `one_time` cannot be cancelled, resumed or rescheduled,
+and is left out of the list counters.
 
 ### Subscription status
 
@@ -310,42 +325,114 @@ transport handles everything else.
 _Full reference: [docs/customers.md](docs/customers.md). Runnable:
 [examples/list_customers.php](examples/list_customers.php)._
 
-Read-only — a customer record is created implicitly the first time someone
-subscribes, through `subscriptions->create()`'s `customer` field.
+A customer record is also created implicitly the first time someone subscribes,
+through `subscriptions->create()`'s `customer` field; `create()` records one
+without opening a subscription.
 
 ```php
+use Suqo\Params\CustomerCreateParams;
+use Suqo\Params\CustomerUpdateParams;
+
 foreach ($suqo->customers->autoPaging() as $customer) {
     echo $customer->id, ' ', $customer->buyerPhone, ' ', $customer->fullName ?? '-', PHP_EOL;
 }
 
 $customer = $suqo->customers->read('cus_0390b1820');
+
+// An upsert: an email or phone you already hold is corrected and answered 200
+// rather than 201, which is what makes this safe to retry.
+$customer = $suqo->customers->create(new CustomerCreateParams(
+    email: 'ram@example.com',
+    phone: '9810000001',          // Nepali mobile; +977 accepted and stripped
+    fullName: 'Ram Bahadur',
+));
+
+// Only what you set is sent. null leaves a field alone; '' clears it.
+$suqo->customers->update($customer->id, new CustomerUpdateParams(address: ''));
 ```
+
+You write `phone` and `email`; you read back `buyerPhone` and `buyerEmail`. The
+phone identifies the buyer and cannot be changed once set.
 
 `id` is a prefixed public id (`cus_0390b1820`) — not an integer and not a UUID,
 unlike the subscription ids elsewhere in the API. Every field except `id`,
 `buyerPhone` and `createdAt` can be `null`.
 
-## Not yet exposed
+## Checkout sessions
 
-openapi declares these operations, which this SDK does not expose. Each needs a
-specification revision first, because §14 forbids public surface the
-specification itself does not describe:
+_Full reference: [docs/checkout-sessions.md](docs/checkout-sessions.md).
+Runnable: [examples/checkout_session.php](examples/checkout_session.php)._
 
-| openapi operationId        | Path                                      |
-| -------------------------- | ----------------------------------------- |
-| `subscriptions_read`       | `GET /api/v1/subscriptions/{id}/`         |
-| `subscriptions_resume`     | `POST /api/v1/subscriptions/{id}/resume/` |
-| `customers_create`         | `POST /api/v1/customers/`                 |
-| `customers_partial_update` | `PATCH /api/v1/customers/{id}/`           |
-| `webhooks_*`               | the eight `/api/v1/webhooks/…` operations |
+One payment for up to ten billing periods, or for lines you price yourself —
+the route to a payment that is not a subscription.
 
-The Webhooks _management_ resource is unexposed; `Suqo\Webhook::verify()` — which
-verifies an inbound delivery and needs no network — is unrelated to it and is
-fully supported.
+```php
+use Suqo\Params\CheckoutItem;
+use Suqo\Params\CreateCheckoutSessionParams;
+
+$session = $suqo->checkoutSessions->create(new CreateCheckoutSessionParams(
+    items: [
+        CheckoutItem::billingPeriod('pbp_3n9k2x'),
+        CheckoutItem::inline(
+            name: 'Setup fee',
+            amount: '2500.00',                  // a decimal string, never a float
+            intervalType: Suqo\IntervalType::OneTime,
+            intervalCount: 0,                   // must be 0 for one_time
+        ),
+    ],
+    returnUrl: 'https://merchant.example.com/orders/1234',
+    customerId: null,        // omit to let the buyer identify by OTP at checkout
+));
+
+echo $session->checkoutUrl, PHP_EOL;            // send this to the buyer
+
+$detail = $suqo->checkoutSessions->read($session->publicId);
+```
+
+An item is **either** a `pbp_id` **or** an inline line, never both — the two
+named constructors make the mixture unrepresentable. Prices are snapshotted when
+the session opens.
+
+Reading a session back works only while it is open: once paid or expired it
+answers 404, carrying its own `return_url` in the error body.
+
+This is the one rate-limited endpoint — 20 sessions a minute per account by
+default — and, being a write, it is not retried for you.
+
+## Managing webhooks
+
+_Full reference: [docs/webhooks.md#managing-webhooks](docs/webhooks.md#managing-webhooks).
+Runnable: [examples/manage_webhooks.php](examples/manage_webhooks.php)._
+
+`$suqo->webhooks` registers and edits the endpoints SUQO delivers to. It is a
+different thing from `Webhook::verify()` above, which checks a delivery that has
+already arrived.
+
+```php
+use Suqo\Model\WebhookEvent;
+use Suqo\Params\WebhookParams;
+use Suqo\Params\WebhookUpdateParams;
+
+$webhook = $suqo->webhooks->create(new WebhookParams(
+    event: WebhookEvent::CheckoutSucceeded,
+    endpointUrl: 'https://merchant.example.com/hooks/suqo',
+));
+
+$suqo->webhooks->testDelivery($webhook->id);                       // 202, async
+$suqo->webhooks->update($webhook->id, new WebhookUpdateParams(isActive: false));
+$suqo->webhooks->delete($webhook->id);
+
+// The secret every delivery is signed with — minted on first read.
+$secret = $suqo->webhooks->secret()->signingSecret;
+```
+
+One webhook per event per account. The endpoint must use https and resolve only
+to public addresses, checked both when you register it and again at delivery
+time. `list()` is the API's one unpaginated collection: a bare array.
 
 ## Examples
 
-Four runnable scripts in [examples/](examples/). Each takes the key from
+Seven runnable scripts in [examples/](examples/). Each takes the key from
 `$SUQO_API_KEY`, so none of them needs editing:
 
 | Script                                                      | What it shows                                                                                                    |
@@ -354,10 +441,15 @@ Four runnable scripts in [examples/](examples/). Each takes the key from
 | [create_subscription.php](examples/create_subscription.php) | Creates a subscription from a `pbpId` and prints the `checkoutUrl` to send the buyer to.                         |
 | [list_customers.php](examples/list_customers.php)           | Auto-pages the customer records, then reads one back by its public id.                                           |
 | [webhook_handler.php](examples/webhook_handler.php)         | A complete endpoint: verify the signature against the raw bytes, then acknowledge.                               |
+| [checkout_session.php](examples/checkout_session.php)       | Opens a checkout session from a `pbpId` plus an inline line, prints the pay URL, reads it back.                   |
+| [manage_subscription.php](examples/manage_subscription.php) | Reads one subscription, tells recurring from one-time, cancels, resumes, and renews it.                          |
+| [manage_webhooks.php](examples/manage_webhooks.php)         | Reads the signing secret, registers an endpoint, sends a test delivery, pauses it, deletes it.                   |
 
 ```bash
 SUQO_API_KEY=su_test_key_… php examples/list_products.php
 SUQO_API_KEY=su_test_key_… php examples/create_subscription.php pbp_3n9k2x
+SUQO_API_KEY=su_test_key_… php examples/checkout_session.php pbp_3n9k2x
+SUQO_API_KEY=su_test_key_… php examples/manage_webhooks.php https://example.com/hooks/suqo
 ```
 
 ## Playground

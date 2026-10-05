@@ -90,6 +90,14 @@ it. Check `$suqo->config->environment` against the key you meant to use.
 The only type that populates `fieldErrors`, and only when the body is
 field-shaped. `getMessage()` is the first message in the body's own key order.
 
+Three endpoints report an illegal state transition as a **bare list** of
+strings rather than a field-keyed object — `subscriptions->cancel()`,
+`->resume()` and `->renew()`, none of which has a request body to key a message
+on. The first message becomes `getMessage()` and `fieldErrors` stays empty.
+`subscriptions->create()` has one case of the same shape:
+`["You already have a subscription to this product."]`, raised when the client
+already holds a live subscription on another billing period of that product.
+
 ```php
 $emailProblems = $e->fieldErrors['email'] ?? [];   // inside the catch block
 ```
@@ -125,11 +133,36 @@ raises `KycRequiredError`.
 An unknown id. Note that a `cancel()` on an id from another environment looks
 exactly like this.
 
+Two places where a 404 is routine rather than a mistake:
+
+- `checkoutSessions->read()` serves a session only while it is **open**. Once it
+  is paid, or once `expires_at` has passed, it answers 404 — and that body
+  carries the session's own `return_url` beside `detail` whenever the session
+  existed:
+
+  ```php
+  $returnUrl = is_array($e->rawBody) ? ($e->rawBody['return_url'] ?? '') : '';
+  ```
+
+  `rawBody` keeps wire names, so it is `return_url` there. That body has two
+  keys, so it does not take the single-key `detail` path below — `getMessage()`
+  is still the `detail` sentence, and `fieldErrors` stays empty because it is
+  attached only on a 400.
+
+- `subscriptions->updateBillingCycle()` never 404s: it names the subscription in
+  the body rather than the path, so an unknown or inactive id comes back as a
+  400 keyed on `subscription_id`.
+
 ### `RateLimitError` — 429
 
 Retried automatically on a `GET` (up to `maxRetries`), and `retryAfter` is honoured
 by the retry policy, capped at 60 s. If it still surfaces, you have exhausted the
 retries; back off using `$e->retryAfter` when it is non-null.
+
+`checkoutSessions->create()` is the one rate-limited endpoint on the partner API
+— 20 sessions a minute per account by default. It is a **write**, so it is not
+retried for you: a blind resend would open a second session. The message names
+the wait, and `retryAfter` carries it in seconds.
 
 ### `ServerError` — 5xx, and anything unmapped
 

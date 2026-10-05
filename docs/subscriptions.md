@@ -1,7 +1,8 @@
 # Subscriptions
 
-`$suqo->subscriptions` — `Suqo\Resource\Subscriptions`. Five methods: list a page,
-iterate every page, create, cancel, and move the next billing date.
+`$suqo->subscriptions` — `Suqo\Resource\Subscriptions`. Eight methods: list a
+page, iterate every page, read one, create, cancel, resume, renew, and move the
+next billing date.
 
 **The SDK says `customer`; the wire says `client`.** The rename is applied in both
 directions at the serialisation boundary. A raw error body, and anything read back
@@ -185,8 +186,11 @@ $result = $suqo->subscriptions->cancel('3fa85f64-5717-4562-b3fc-2c963f66afa6');
 echo $result->message, PHP_EOL;
 ```
 
-There is no `resume()`. `subscriptions_resume` exists in openapi but is not exposed
-— see [the README](../README.md#not-yet-exposed).
+Cancellation is scheduled, not immediate: the subscription stays usable until
+the end of the current billing period, and [`resume`](#resume) undoes it until
+then. A subscription already cancelled or pending cancellation is returned
+unchanged with a 200, so a retry is safe. A one-time purchase has nothing to
+cancel and answers 400.
 
 ## `updateBillingCycle`
 
@@ -221,6 +225,109 @@ $suqo->subscriptions->updateBillingCycle(new UpdateBillingCycleParams(
 
 `nextBillingCycle` is `YYYY-MM-DD` and stays a string — the SDK does no date
 parsing, for the same reason it does no decimal parsing.
+
+## `read`
+
+```php
+public function read(string $id, ?Cancellation $cancellation = null): Subscription
+```
+
+`GET /api/v1/subscriptions/{id}/` (openapi `subscriptions_read`).
+
+| Parameter | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `id` | `string` | — | The subscription UUID. Escaped into the path. |
+| `cancellation` | `?Cancellation` | `null` | |
+
+**Returns** `Subscription` — the same record shape the list yields, documented
+under [The record](#the-record).
+
+**Throws** `NotFoundError` on 404, including for an id belonging to another
+environment. Retried automatically like any other `GET`.
+
+```php
+$subscription = $suqo->subscriptions->read('3fa85f64-5717-4562-b3fc-2c963f66afa6');
+
+$status = $subscription->status;   // a case, or the raw string, or null
+echo $status instanceof SubscriptionStatus ? $status->value : ($status ?? '-'), PHP_EOL;
+echo $subscription->customer?->email ?? '-', PHP_EOL;
+```
+
+**Nothing on the record says whether it is recurring.** Match
+`$subscription->product?->pbpId` against [`products->list()`](products.md#list)
+and read that billing period's `intervalType`: `one_time` means the subscription
+cannot be cancelled, resumed or rescheduled, and is left out of the counters on
+the list response.
+
+## `resume`
+
+```php
+public function resume(string $id, ?Cancellation $cancellation = null): MessageResponse
+```
+
+`POST /api/v1/subscriptions/{id}/resume/` (openapi `subscriptions_resume`) —
+undo a scheduled cancellation and return the subscription to active.
+
+| Parameter | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `id` | `string` | — | The subscription id. Escaped into the path. |
+| `cancellation` | `?Cancellation` | `null` | |
+
+**Returns** `MessageResponse`.
+
+**Throws** `NotFoundError` on 404; `ValidationError` on 400 when the
+subscription is a one-time purchase, when its product or billing period is no
+longer available, or when its status has no resume transition — *already
+cancelled* is the common one. Not retried.
+
+An already-active subscription is returned unchanged, so a retry is safe.
+
+openapi declares no request body, so none is sent and no `Content-Type` header
+is set.
+
+```php
+$suqo->subscriptions->resume('3fa85f64-5717-4562-b3fc-2c963f66afa6');
+```
+
+> The 400 here is a **bare list** of messages rather than a field-keyed object —
+> there is no request body, so there is no field to key the message on. The SDK
+> surfaces the first message as `getMessage()`; `fieldErrors` stays empty. See
+> [errors.md](errors.md#validationerror--400).
+
+## `renew`
+
+```php
+public function renew(string $subscriptionId, ?Cancellation $cancellation = null): CheckoutSession
+```
+
+`POST /api/v1/subscription/renew/` (openapi `subscription_renew_create`) — open
+a checkout session for the **next** payment on an existing subscription, reusing
+its customer and billing period rather than resubmitting them.
+
+Note the singular noun in the path. That is the API's spelling, and the
+subscription is named in the body rather than the path — which is why this takes
+a plain string and not a params object.
+
+| Parameter | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `subscriptionId` | `string` | — | Sent as `subscription_id` in the body. |
+| `cancellation` | `?Cancellation` | `null` | |
+
+**Returns** `Suqo\Model\CheckoutSession` — `publicId`, `expiresAt`,
+`checkoutUrl`. Send the `checkoutUrl` to the buyer to collect payment.
+
+**Throws** `NotFoundError` on 404; `ValidationError` on 400 when the
+subscription is cancelled or archived, or is a paid one-time purchase — again a
+bare list of messages. Not retried.
+
+```php
+$session = $suqo->subscriptions->renew('3fa85f64-5717-4562-b3fc-2c963f66afa6');
+
+echo $session->checkoutUrl, PHP_EOL;
+```
+
+See [checkout-sessions.md](checkout-sessions.md) for the session's own
+operations, including reading one back while it is open.
 
 ## The record
 
