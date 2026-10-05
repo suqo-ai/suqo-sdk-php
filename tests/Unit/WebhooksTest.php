@@ -35,14 +35,20 @@ final class WebhooksTest extends TransportTestCase
         self::assertStringContainsString('/api/v1/webhooks/', $client->lastRequest()->url);
     }
 
-    /** An empty account, and a body that is not a list at all, both read as none. */
-    public function testListToleratesAnEmptyOrUnexpectedBody(): void
+    /** An empty account reads as none. */
+    public function testListToleratesAnEmptyBody(): void
     {
-        $client = (new MockHttpClient())->pushJson(200, [])->pushJson(200, null);
-        $webhooks = new Webhooks($this->transport($client));
+        $client = (new MockHttpClient())->pushJson(200, []);
 
-        self::assertSame([], $webhooks->list());
-        self::assertSame([], $webhooks->list());
+        self::assertSame([], (new Webhooks($this->transport($client)))->list());
+    }
+
+    /** So does a body that is not a list at all. */
+    public function testListToleratesAnUnexpectedBody(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, null);
+
+        self::assertSame([], (new Webhooks($this->transport($client)))->list());
     }
 
     /** §9.3 — an event this SDK does not name surfaces as the raw string. */
