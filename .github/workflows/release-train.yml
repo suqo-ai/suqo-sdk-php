@@ -152,8 +152,14 @@ jobs:
           EOF
           )
 
-          if gh pr view release/next --json number >/dev/null 2>&1; then
-            gh pr edit release/next --title "chore(release): ${VERSION}" --body "$BODY"
+          # `gh pr view <branch>` resolves a PR on that branch in ANY state, so a
+          # previously merged Release PR made this look like "one already
+          # exists": the train then retitled that merged PR and opened nothing.
+          # Ask for an OPEN one instead.
+          OPEN_PR="$(gh pr list --head release/next --state open --json number --jq '.[0].number // empty')"
+
+          if [ -n "$OPEN_PR" ]; then
+            gh pr edit "$OPEN_PR" --title "chore(release): ${VERSION}" --body "$BODY"
           else
             gh pr create \
               --base main --head release/next \
