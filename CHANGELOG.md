@@ -10,6 +10,10 @@ project follows [Semantic Versioning](https://semver.org/) as described in
 
 _Nothing yet._
 
+## [1.1.1] - 2026-10-26
+
+_Nothing yet._
+
 ## [1.1.0] - 2026-10-05
 
 <!-- Release-As: 1.1.0 -->
