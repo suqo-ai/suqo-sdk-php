@@ -61,9 +61,15 @@ construction — the environment is not the caller's call site. An unrecognised
 | `$suqo->config` | `Config` | The resolved, validated configuration. |
 | `$suqo->products` | `Resource\Products` | See [products.md](products.md). |
 | `$suqo->subscriptions` | `Resource\Subscriptions` | See [subscriptions.md](subscriptions.md). |
-| `$suqo->customers` | `Resource\Customers` | Reserved; every call throws. See [customers.md](customers.md). |
+| `$suqo->customers` | `Resource\Customers` | See [customers.md](customers.md). |
+| `$suqo->checkoutSessions` | `Resource\CheckoutSessions` | See [checkout-sessions.md](checkout-sessions.md). |
+| `$suqo->webhooks` | `Resource\Webhooks` | See [webhooks.md](webhooks.md#managing-webhooks). |
+| `$suqo->payouts` | `Resource\Payouts` | See [payouts.md](payouts.md). |
+| `$suqo->bankAccounts` | `Resource\BankAccounts` | See [bank-accounts.md](bank-accounts.md). |
+| `$suqo->byop` | `Resource\Byop` | See [byop.md](byop.md). |
+| `$suqo->subSellers` | `Resource\SubSellers` | See [sub-sellers.md](sub-sellers.md). |
 
-All four are `readonly`. The `Transport` behind them is private by design.
+All are `readonly`. The `Transport` behind them is private by design.
 
 ## `SuqoClient::verifyWebhook`
 

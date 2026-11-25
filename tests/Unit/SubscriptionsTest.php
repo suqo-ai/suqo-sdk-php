@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Suqo\Tests\Unit;
 
+use Suqo\Exception\ServerError;
+use Suqo\Exception\SuqoError;
 use Suqo\Exception\ValidationError;
+use Suqo\IntervalType;
 use Suqo\Model\SubscriptionStatus;
+use Suqo\Params\PlanChangeParams;
 use Suqo\Resource\Subscriptions;
 use Suqo\Tests\Support\MockHttpClient;
 use Suqo\Tests\Support\TransportTestCase;
@@ -123,5 +127,146 @@ final class SubscriptionsTest extends TransportTestCase
         (new Subscriptions($this->transport($client)))->read('sub_1/../customers');
 
         self::assertStringNotContainsString('/../', $client->lastRequest()->url);
+    }
+
+    // changePreview / change
+
+    private const PLAN_CHANGE_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+
+    public function testPreviewPostsABillingPeriodTarget(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::quote());
+
+        (new Subscriptions($this->transport($client)))->changePreview(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_3n9k2x'));
+
+        self::assertSame(['pbp_id' => 'pbp_3n9k2x'], self::decodeBody($client));
+    }
+
+    public function testPreviewHitsTheChangePreviewRoute(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::quote());
+
+        (new Subscriptions($this->transport($client)))->changePreview(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_3n9k2x'));
+
+        self::assertStringContainsString('/api/v1/subscriptions/' . self::PLAN_CHANGE_ID . '/change-preview/', $client->lastRequest()->url);
+    }
+
+    public function testAnInlineTargetSendsAllFourFields(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::quote());
+
+        (new Subscriptions($this->transport($client)))->changePreview(
+            self::PLAN_CHANGE_ID,
+            PlanChangeParams::inline(name: 'Pro custom', amount: '1500', intervalType: IntervalType::Month, intervalCount: 1),
+        );
+
+        self::assertSame(
+            ['name' => 'Pro custom', 'amount' => '1500', 'interval_type' => 'month', 'interval_count' => 1],
+            self::decodeBody($client),
+        );
+    }
+
+    public function testPreviewDecodesTheQuote(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::quote());
+
+        $quote = (new Subscriptions($this->transport($client)))->changePreview(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
+
+        self::assertSame(['upgrade', 'last_payment', 450, '2026-12-03'], [$quote->type, $quote->basis, $quote->amountDue, $quote->newExpiryDate]);
+    }
+
+    /** DRF encodes the rates' Decimals as JSON numbers; they still read as strings. */
+    public function testDailyRatesSentAsNumbersDecodeToDecimalStrings(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::quote());
+
+        $quote = (new Subscriptions($this->transport($client)))->changePreview(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
+
+        self::assertSame(['33.3333', '50'], [$quote->currentDailyRate, $quote->newDailyRate]);
+    }
+
+    public function testAPreviewCarriesNoCheckout(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::quote());
+
+        $quote = (new Subscriptions($this->transport($client)))->changePreview(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
+
+        self::assertNull($quote->checkoutUrl);
+    }
+
+    public function testAnUpgradeChangeReturnsTheCheckout(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::quote() + [
+            'checkout_session_id' => 'cs_9f8e7d',
+            'checkout_url' => 'https://app.suqo.ai/checkout/cs_9f8e7d',
+        ]);
+
+        $quote = (new Subscriptions($this->transport($client)))->change(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
+
+        self::assertSame(['cs_9f8e7d', 'https://app.suqo.ai/checkout/cs_9f8e7d'], [$quote->checkoutSessionId, $quote->checkoutUrl]);
+    }
+
+    public function testChangeHitsTheChangeRoute(): void
+    {
+        $client = (new MockHttpClient())->pushJson(200, self::quote());
+
+        (new Subscriptions($this->transport($client)))->change(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
+
+        self::assertStringEndsWith('/api/v1/subscriptions/' . self::PLAN_CHANGE_ID . '/change/', $client->lastRequest()->url);
+    }
+
+    /** A write: a 5xx is not retried. */
+    public function testChangeIsNotRetried(): void
+    {
+        $client = (new MockHttpClient())->pushJson(503, ['detail' => 'down'], times: 3);
+
+        try {
+            (new Subscriptions($this->transport($client)))->change(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
+        } catch (ServerError) {
+        }
+
+        self::assertCount(1, $client->requests);
+    }
+
+    public function testAMixedTargetRejectionIsAValidationError(): void
+    {
+        $client = (new MockHttpClient())->pushJson(400, ['amount' => ['Not allowed with pbp_id; the plan sets this.']]);
+
+        $this->expectException(ValidationError::class);
+
+        (new Subscriptions($this->transport($client)))->change(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1', ['amount' => '10']));
+    }
+
+    /** 422 has no dedicated mapping; it surfaces with its status and detail intact. */
+    public function testAnUnchangeablePlanSurfacesThe422Detail(): void
+    {
+        $client = (new MockHttpClient())->pushJson(422, ['detail' => 'Resume the subscription before changing its plan.']);
+
+        try {
+            (new Subscriptions($this->transport($client)))->change(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
+            self::fail('Expected a SuqoError.');
+        } catch (SuqoError $error) {
+            self::assertSame([422, 'Resume the subscription before changing its plan.'], [$error->status, $error->getMessage()]);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private static function quote(): array
+    {
+        return [
+            'type' => 'upgrade',
+            'basis' => 'last_payment',
+            'current_daily_rate' => 33.3333,
+            'new_daily_rate' => 50.0,
+            'remaining_days' => 27,
+            'amount_due' => 450,
+            'days_added' => 0,
+            'new_expiry_date' => '2026-12-03',
+        ];
+    }
+
+    private static function decodeBody(MockHttpClient $client): mixed
+    {
+        return json_decode((string) $client->lastRequest()->body, true);
     }
 }

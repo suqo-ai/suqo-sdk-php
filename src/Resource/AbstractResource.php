@@ -24,4 +24,29 @@ abstract class AbstractResource
     {
         return ['page' => $page, 'page_size' => $pageSize];
     }
+
+    /**
+     * The records of an unpaginated collection — a bare JSON array. Anything
+     * that is not a list of objects reads as none, so an empty account and an
+     * unexpected body both decode to `[]`.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected static function bareList(mixed $body): array
+    {
+        if (!is_array($body)) {
+            return [];
+        }
+
+        $out = [];
+
+        foreach ($body as $record) {
+            if (is_array($record) && ($record === [] || !array_is_list($record))) {
+                /** @var array<string, mixed> $record */
+                $out[] = $record;
+            }
+        }
+
+        return $out;
+    }
 }

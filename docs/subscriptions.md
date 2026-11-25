@@ -1,8 +1,8 @@
 # Subscriptions
 
-`$suqo->subscriptions` — `Suqo\Resource\Subscriptions`. Eight methods: list a
-page, iterate every page, read one, create, cancel, resume, renew, and move the
-next billing date.
+`$suqo->subscriptions` — `Suqo\Resource\Subscriptions`. Ten methods: list a
+page, iterate every page, read one, create, cancel, resume, renew, move the
+next billing date, and preview or apply a plan change.
 
 **The SDK says `customer`; the wire says `client`.** The rename is applied in both
 directions at the serialisation boundary. A raw error body, and anything read back
@@ -328,6 +328,108 @@ echo $session->checkoutUrl, PHP_EOL;
 
 See [checkout-sessions.md](checkout-sessions.md) for the session's own
 operations, including reading one back while it is open.
+
+## `changePreview`
+
+```php
+public function changePreview(
+    string $id,
+    PlanChangeParams $params,
+    ?Cancellation $cancellation = null,
+): PlanChangeQuote
+```
+
+`POST /api/v1/subscriptions/{id}/change-preview/` (openapi
+`subscriptions_change_preview`) — what moving the subscription onto another
+price would cost (an upgrade) or how many days it would add (a downgrade).
+**Changes nothing.**
+
+| Parameter | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `id` | `string` | — | The subscription id. Escaped into the path. |
+| `params` | `PlanChangeParams` | — | `PlanChangeParams::billingPeriod($pbpId)` or `PlanChangeParams::inline(…)`. |
+| `cancellation` | `?Cancellation` | `null` | |
+
+The target is **either** one of your prices **or** an inline price — never a
+mix, the same rule as a checkout item, and the two named constructors make the
+mixture unrepresentable. An inline price needs all four of `name`, `amount`
+(a decimal string, minimum 50), `intervalType` and `intervalCount`; `one_time`
+is refused. Moving onto an inline price detaches the subscription from its
+product, and VAT is added to its amount from your account's settings.
+
+**Returns** `Suqo\Model\PlanChangeQuote`:
+
+| Property | Type | Notes |
+| --- | --- | --- |
+| `type` | `?string` | `upgrade`, `downgrade` or `lateral` (same daily cost: nothing owed, expiry unchanged). |
+| `basis` | `?string` | `last_payment`, or `current_price` when no payment record was found. |
+| `currentDailyRate` / `newDailyRate` | `?string` | Decimal strings, four places. |
+| `remainingDays` | `?int` | Days left on the current period. |
+| `amountDue` | `?int` | Whole NPR, VAT inside. Non-zero only on an upgrade; minimum 50. |
+| `daysAdded` | `?int` | Days a downgrade (or a minimum-charge upgrade) adds. |
+| `newExpiryDate` | `?string` | `Y-m-d`. |
+| `checkoutSessionId` / `checkoutUrl` | `?string` | Always `null` on a preview. |
+
+**Throws** `ValidationError` on 400 — an inline field beside a `pbp_id`, a
+missing inline field, an amount under 50, an interval out of range or
+`one_time`. `NotFoundError` on 404 — the subscription, or a `pbp_id` that is not
+yours. A plan that **cannot** change — the same price, expired, unpaid,
+cancelled, the target unavailable, or a change payment already pending —
+answers **422** with a `detail`; no exception class is dedicated to 422, so it
+surfaces as a `SuqoError` (concretely `ServerError`) whose `status` is `422`
+and whose message is that `detail`. Not retried.
+
+```php
+use Suqo\Params\PlanChangeParams;
+
+$quote = $suqo->subscriptions->changePreview(
+    '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    PlanChangeParams::billingPeriod('pbp_7h2m4q'),
+);
+
+echo $quote->type, ' ', $quote->amountDue, ' NPR, expires ', $quote->newExpiryDate, PHP_EOL;
+```
+
+## `change`
+
+```php
+public function change(
+    string $id,
+    PlanChangeParams $params,
+    ?Cancellation $cancellation = null,
+): PlanChangeQuote
+```
+
+`POST /api/v1/subscriptions/{id}/change/` (openapi `subscriptions_change`) —
+recalculate and apply the change. Same parameters, errors and return type as
+[`changePreview`](#changepreview).
+
+- **A downgrade or a free switch applies now.** `checkoutSessionId` and
+  `checkoutUrl` are `null`.
+- **An upgrade returns a checkout.** Send `checkoutUrl` to the buyer; the plan
+  switches once they pay, and the link expires after 30 minutes. If the
+  subscription is cancelled, expires or changes plan before the payment
+  settles, the link stops accepting payment, or a payment already taken leaves
+  the plan as it is.
+
+A write, so it is not retried for you. A second `change` while an upgrade
+payment is pending answers 422.
+
+```php
+$result = $suqo->subscriptions->change(
+    '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    PlanChangeParams::inline(
+        name: 'Pro custom',
+        amount: '1500',
+        intervalType: Suqo\IntervalType::Month,
+        intervalCount: 1,
+    ),
+);
+
+if ($result->checkoutUrl !== null) {
+    echo 'collect ', $result->amountDue, ' NPR at ', $result->checkoutUrl, PHP_EOL;
+}
+```
 
 ## The record
 

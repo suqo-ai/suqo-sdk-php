@@ -131,6 +131,13 @@ properties and `toArray()`.
 | `CheckoutSeller` | `id`, `phone`, `businessLogo`, `businessName` |
 | `WebhookEndpoint` | `id` (a `whk_…` public id), `event` (`WebhookEvent\|string\|null`), `endpointUrl`, `isActive` (`?bool`), `createdAt` |
 | `SigningSecret` | `signingSecret` (`string`, non-null) |
+| `PlanChangeQuote` | `type`, `basis`, `currentDailyRate`, `newDailyRate`, `remainingDays` / `amountDue` / `daysAdded` (`?int`), `newExpiryDate`, `checkoutSessionId`, `checkoutUrl` |
+| `Payout` | `payoutId` (a `PYT-…` public id), `status`, `amount`, `providerCharge`, `suqoPlatformFee`, `smsCharge`, `netAmount`, `requestedDate`, `paidDate`, `receiptUrl` |
+| `BankAccount` | `id` (`?int`), `bankName`, `accountName`, `branch`, `accountNumberMasked`, `verifiedAt`, `createdAt`, `updatedAt` |
+| `PaymentMethod` | `companyId`, `paymentTypeId`, `paymentType`, `alias`, `logo`, `order` (`?int`), `isActive` / `isConfigured` / `isVerified` (`?bool`), `fee` |
+| `ByopFee` | `processingFee` |
+| `SubSeller` | `id` (a `usr_…` public id), `email`, `legalBusinessName`, `kyc` (`?SubSellerKyc`), `createdAt` |
+| `SubSellerKyc` | `status`, `rejectionReason`, `resubmittedAt`, `verifiedAt` |
 
 Unless noted, every property is `?string`, and every wire key is the snake_case form
 of the property name. The renames worth memorising: `customer` ⇄ `client`, and
@@ -464,6 +471,42 @@ public function __construct(
 For `update`. Only what you set is sent, so pausing deliveries is
 `new WebhookUpdateParams(isActive: false)` — a body of exactly
 `{"is_active": false}`.
+
+### `PlanChangeParams`
+
+The target of `subscriptions->changePreview()` and `->change()`. Like
+`CheckoutItem`, two named constructors, because the API takes two mutually
+exclusive shapes:
+
+```php
+PlanChangeParams::billingPeriod(string $pbpId, array $extra = []);
+PlanChangeParams::inline(
+    string $name,
+    string $amount,                     // decimal string, minimum 50
+    IntervalType|string $intervalType,  // not one_time
+    int $intervalCount,
+    array $extra = [],
+);
+```
+
+### `BankAccountParams`
+
+`bankName`, `accountName`, `accountNumber`, `branch` — all required `string`s,
+sent as `bank_name`, `account_name`, `account_number`, `branch`.
+
+### `BankAccountUpdateParams`
+
+`code` (`int`, required, sent on every call) plus optional `bankName`,
+`accountName`, `accountNumber`, `branch` — only what you set is sent.
+
+### `ByopCredentialsParams`
+
+`fields` — an `array<string, mixed>` of the gateway's credential fields under
+wire names, sent verbatim. There is no `extra`: the whole body already is one.
+
+### `ByopFeeParams`
+
+`processingFee` (`?string`) — always sent; `null` clears the fee.
 
 ### Inspecting what will be sent
 
