@@ -37,8 +37,6 @@ final class Endpoints
 
     public const BYOP_PAYMENT_METHODS = '/api/v1/byop/payment-methods';
 
-    public const SUB_SELLERS = '/api/v1/sub-sellers';
-
     /** @var string Template; interpolate via {@see self::customerRead()}. */
     private const CUSTOMER_READ = '/api/v1/customers/{id}';
 

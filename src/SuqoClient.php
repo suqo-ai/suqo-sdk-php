@@ -16,7 +16,6 @@ use Suqo\Resource\Customers;
 use Suqo\Resource\Payouts;
 use Suqo\Resource\Products;
 use Suqo\Resource\Subscriptions;
-use Suqo\Resource\SubSellers;
 use Suqo\Resource\Webhooks;
 
 /**
@@ -58,8 +57,6 @@ final class SuqoClient
 
     /** Bring-your-own-payment: payment methods, gateway credentials and fees. */
     public readonly Byop $byop;
-
-    public readonly SubSellers $subSellers;
 
     private readonly Transport $transport;
 
@@ -111,7 +108,6 @@ final class SuqoClient
         $this->payouts = new Payouts($this->transport);
         $this->bankAccounts = new BankAccounts($this->transport);
         $this->byop = new Byop($this->transport);
-        $this->subSellers = new SubSellers($this->transport);
     }
 
     /**

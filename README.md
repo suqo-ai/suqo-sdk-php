@@ -542,25 +542,9 @@ $suqo->byop->updateFee($paymentTypeId, new ByopFeeParams('1.75'));   // null cle
 Credentials are checked against the gateway in the background — read
 `isVerified` on `paymentMethods()` afterwards.
 
-## Sub-sellers
-
-_Full reference: [docs/sub-sellers.md](docs/sub-sellers.md). Runnable:
-[examples/list_sub_sellers.php](examples/list_sub_sellers.php)._
-
-```php
-foreach ($suqo->subSellers->autoPaging() as $sub) {
-    echo $sub->id, ' ', $sub->email, ' ', $sub->kyc?->status, PHP_EOL;  // usr_…
-}
-```
-
-`kyc->status` is `KYC_VERIFICATION_PENDING`, `KYC_VERIFIED` or
-`KYC_RE_VERIFICATION`, the last with a plain-text `rejectionReason`. Registering
-a sub-seller, resubmitting its KYC and acting as it through the `Suqo-Account`
-header are not exposed yet — see [docs/sub-sellers.md](docs/sub-sellers.md).
-
 ## Examples
 
-Eleven runnable scripts in [examples/](examples/). Each takes the key from
+Ten runnable scripts in [examples/](examples/). Each takes the key from
 `$SUQO_API_KEY`, so none of them needs editing:
 
 | Script                                                      | What it shows                                                                                                    |
@@ -575,7 +559,6 @@ Eleven runnable scripts in [examples/](examples/). Each takes the key from
 | [manage_bank_account.php](examples/manage_bank_account.php) | Adds a bank account and emails its code, or verifies it with the code you pass.                                 |
 | [request_payout.php](examples/request_payout.php)           | Requests a payout, reports why when it is refused, and lists past payouts.                                       |
 | [manage_byop.php](examples/manage_byop.php)                 | Lists payment methods with their BYOP state, and sets a processing fee on one.                                   |
-| [list_sub_sellers.php](examples/list_sub_sellers.php)       | Auto-pages the sub-sellers and their KYC status, with the rejection reason when there is one.                    |
 
 ```bash
 SUQO_API_KEY=su_test_key_… php examples/list_products.php

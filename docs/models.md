@@ -136,8 +136,6 @@ properties and `toArray()`.
 | `BankAccount` | `id` (`?int`), `bankName`, `accountName`, `branch`, `accountNumberMasked`, `verifiedAt`, `createdAt`, `updatedAt` |
 | `PaymentMethod` | `companyId`, `paymentTypeId`, `paymentType`, `alias`, `logo`, `order` (`?int`), `isActive` / `isConfigured` / `isVerified` (`?bool`), `fee` |
 | `ByopFee` | `processingFee` |
-| `SubSeller` | `id` (a `usr_…` public id), `email`, `legalBusinessName`, `kyc` (`?SubSellerKyc`), `createdAt` |
-| `SubSellerKyc` | `status`, `rejectionReason`, `resubmittedAt`, `verifiedAt` |
 
 Unless noted, every property is `?string`, and every wire key is the snake_case form
 of the property name. The renames worth memorising: `customer` ⇄ `client`, and

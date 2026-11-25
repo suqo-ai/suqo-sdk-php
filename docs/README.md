@@ -18,7 +18,6 @@ Everything is namespaced under `Suqo\`, PSR-4 from `src/`.
 | [payouts.md](payouts.md) | `Resource\Payouts` — `list`, `autoPaging`, `create`, `read` |
 | [bank-accounts.md](bank-accounts.md) | `Resource\BankAccounts` — `list`, `create`, `read`, `update`, `delete`, `sendOtp` |
 | [byop.md](byop.md) | `Resource\Byop` — `paymentMethods`, `updateCredentials`, `updateFee` |
-| [sub-sellers.md](sub-sellers.md) | `Resource\SubSellers` — `list`, `autoPaging` |
 | [webhooks.md](webhooks.md) | `Webhook::verify`, `SuqoClient::verifyWebhook`, and `Resource\Webhooks` — the eight management operations |
 | [errors.md](errors.md) | the exception hierarchy, error fields, `ErrorMapper` |
 | [models.md](models.md) | response models, params objects, `SubscriptionStatus` |
@@ -64,8 +63,6 @@ Everything callable, in one table.
 | `$suqo->byop->paymentMethods(…)` | `list<PaymentMethod>` | [byop](byop.md#paymentmethods) |
 | `$suqo->byop->updateCredentials(…)` | `DetailResponse` | [byop](byop.md#updatecredentials) |
 | `$suqo->byop->updateFee(…)` | `ByopFee` | [byop](byop.md#updatefee) |
-| `$suqo->subSellers->list(…)` | `Page<SubSeller>` | [sub-sellers](sub-sellers.md#list) |
-| `$suqo->subSellers->autoPaging(…)` | `Generator<int, SubSeller>` | [sub-sellers](sub-sellers.md#autopaging) |
 | `$suqo->webhooks->list(…)` | `list<WebhookEndpoint>` | [webhooks](webhooks.md#list) |
 | `$suqo->webhooks->create(…)` | `WebhookEndpoint` | [webhooks](webhooks.md#create) |
 | `$suqo->webhooks->read(…)` | `WebhookEndpoint` | [webhooks](webhooks.md#read) |

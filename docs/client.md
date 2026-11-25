@@ -67,7 +67,6 @@ construction — the environment is not the caller's call site. An unrecognised
 | `$suqo->payouts` | `Resource\Payouts` | See [payouts.md](payouts.md). |
 | `$suqo->bankAccounts` | `Resource\BankAccounts` | See [bank-accounts.md](bank-accounts.md). |
 | `$suqo->byop` | `Resource\Byop` | See [byop.md](byop.md). |
-| `$suqo->subSellers` | `Resource\SubSellers` | See [sub-sellers.md](sub-sellers.md). |
 
 All are `readonly`. The `Transport` behind them is private by design.
 
