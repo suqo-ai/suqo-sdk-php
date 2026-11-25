@@ -90,14 +90,6 @@ final class ErrorMapper
                 $c['kind'] === self::KIND_FIELD ? $c['fieldErrors'] : [],
                 $retryAfter,
             ),
-            $status === 422 => new UnprocessableError(
-                $classified ?? 'Unprocessable request.',
-                $status,
-                $requestId,
-                $body,
-                [],
-                $retryAfter,
-            ),
             $status === 429 => new RateLimitError(
                 $classified ?? 'Rate limited.',
                 $status,

@@ -19,11 +19,7 @@ type or exception parent moves.
   `/change/`). Adds `PlanChangeParams`, whose `billingPeriod()` and `inline()`
   named constructors keep the two target shapes apart like `CheckoutItem`, and
   `PlanChangeQuote`. An upgrade returns a `checkoutUrl`; a plan that cannot
-  change answers 422, raised as the new `UnprocessableError`.
-- `Suqo\Exception\UnprocessableError` — a new `SuqoError` subtype for 422, with
-  the body's `detail` as its message. Before this, a 422 fell through to the
-  `ServerError` default arm; no `/api/v1` route answered 422 until plan change,
-  so no existing call can have relied on that. Not retried.
+  change answers 422, which surfaces as a `SuqoError` with `status` 422.
 - `$suqo->payouts` — `list`, `autoPaging`, `create`, `read`. Adds `Payout`.
   Amounts are decimal strings at up to three places.
 - `$suqo->bankAccounts` — `list` (unpaginated), `create`, `read`, `update`

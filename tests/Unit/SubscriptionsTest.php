@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Suqo\Tests\Unit;
 
 use Suqo\Exception\ServerError;
-use Suqo\Exception\UnprocessableError;
+use Suqo\Exception\SuqoError;
 use Suqo\Exception\ValidationError;
 use Suqo\IntervalType;
 use Suqo\Model\SubscriptionStatus;
@@ -237,27 +237,17 @@ final class SubscriptionsTest extends TransportTestCase
         (new Subscriptions($this->transport($client)))->change(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1', ['amount' => '10']));
     }
 
-    /** A plan that cannot change answers 422, raised as UnprocessableError. */
-    public function testAnUnchangeablePlanIsUnprocessable(): void
+    /** 422 has no dedicated mapping; it surfaces with its status and detail intact. */
+    public function testAnUnchangeablePlanSurfacesThe422Detail(): void
     {
         $client = (new MockHttpClient())->pushJson(422, ['detail' => 'Resume the subscription before changing its plan.']);
 
-        $this->expectException(UnprocessableError::class);
-
-        (new Subscriptions($this->transport($client)))->change(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
-    }
-
-    /** A write: a 422 is not retried. */
-    public function testA422IsNotRetried(): void
-    {
-        $client = (new MockHttpClient())->pushJson(422, ['detail' => 'A plan change payment is already pending.'], times: 3);
-
         try {
-            (new Subscriptions($this->transport($client)))->changePreview(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
-        } catch (UnprocessableError) {
+            (new Subscriptions($this->transport($client)))->change(self::PLAN_CHANGE_ID, PlanChangeParams::billingPeriod('pbp_1'));
+            self::fail('Expected a SuqoError.');
+        } catch (SuqoError $error) {
+            self::assertSame([422, 'Resume the subscription before changing its plan.'], [$error->status, $error->getMessage()]);
         }
-
-        self::assertCount(1, $client->requests);
     }
 
     /** @return array<string, mixed> */

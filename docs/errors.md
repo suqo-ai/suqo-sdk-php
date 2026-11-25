@@ -12,7 +12,6 @@ faults included.
     ├── PermissionDeniedError 403 without one
     ├── ValidationError       400
     ├── NotFoundError         404
-    ├── UnprocessableError    422
     ├── RateLimitError        429
     ├── ServerError           >= 500, and any status not mapped above
     ├── NetworkError          transport failure, timeout, refused URL (status 0)
@@ -153,16 +152,6 @@ Two places where a 404 is routine rather than a mistake:
 - `subscriptions->updateBillingCycle()` never 404s: it names the subscription in
   the body rather than the path, so an unknown or inactive id comes back as a
   400 keyed on `subscription_id`.
-
-### `UnprocessableError` — 422
-
-The request was well-formed, but the resource's current state does not allow
-it. `getMessage()` is the body's `detail`; `fieldErrors` stays empty. Not
-retried: the same request will keep failing until the state changes.
-
-Today only `subscriptions->changePreview()` and `->change()` answer 422 — the
-same price, an expired, unpaid or cancelled subscription, an unavailable target,
-or a change payment already pending.
 
 ### `RateLimitError` — 429
 
