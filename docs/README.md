@@ -15,6 +15,9 @@ Everything is namespaced under `Suqo\`, PSR-4 from `src/`.
 | [subscriptions.md](subscriptions.md) | `Resource\Subscriptions` |
 | [customers.md](customers.md) | `Resource\Customers` — `list`, `autoPaging`, `read`, `create`, `update` |
 | [checkout-sessions.md](checkout-sessions.md) | `Resource\CheckoutSessions` — `create`, `read` |
+| [payouts.md](payouts.md) | `Resource\Payouts` — `list`, `autoPaging`, `create`, `read` |
+| [bank-accounts.md](bank-accounts.md) | `Resource\BankAccounts` — `list`, `create`, `read`, `update`, `delete`, `sendOtp` |
+| [byop.md](byop.md) | `Resource\Byop` — `paymentMethods`, `updateCredentials`, `updateFee` |
 | [webhooks.md](webhooks.md) | `Webhook::verify`, `SuqoClient::verifyWebhook`, and `Resource\Webhooks` — the eight management operations |
 | [errors.md](errors.md) | the exception hierarchy, error fields, `ErrorMapper` |
 | [models.md](models.md) | response models, params objects, `SubscriptionStatus` |
@@ -38,6 +41,8 @@ Everything callable, in one table.
 | `$suqo->subscriptions->resume(…)` | `MessageResponse` | [subscriptions](subscriptions.md#resume) |
 | `$suqo->subscriptions->renew(…)` | `CheckoutSession` | [subscriptions](subscriptions.md#renew) |
 | `$suqo->subscriptions->updateBillingCycle(…)` | `MessageResponse` | [subscriptions](subscriptions.md#updatebillingcycle) |
+| `$suqo->subscriptions->changePreview(…)` | `PlanChangeQuote` | [subscriptions](subscriptions.md#changepreview) |
+| `$suqo->subscriptions->change(…)` | `PlanChangeQuote` | [subscriptions](subscriptions.md#change) |
 | `$suqo->customers->list(…)` | `Page<Customer>` | [customers](customers.md#list) |
 | `$suqo->customers->autoPaging(…)` | `Generator<int, Customer>` | [customers](customers.md#autopaging) |
 | `$suqo->customers->read(…)` | `Customer` | [customers](customers.md#read) |
@@ -45,6 +50,19 @@ Everything callable, in one table.
 | `$suqo->customers->update(…)` | `Customer` | [customers](customers.md#update) |
 | `$suqo->checkoutSessions->create(…)` | `CheckoutSession` | [checkout-sessions](checkout-sessions.md#create) |
 | `$suqo->checkoutSessions->read(…)` | `CheckoutSessionDetail` | [checkout-sessions](checkout-sessions.md#read) |
+| `$suqo->payouts->list(…)` | `Page<Payout>` | [payouts](payouts.md#list) |
+| `$suqo->payouts->autoPaging(…)` | `Generator<int, Payout>` | [payouts](payouts.md#autopaging) |
+| `$suqo->payouts->create(…)` | `Payout` | [payouts](payouts.md#create) |
+| `$suqo->payouts->read(…)` | `Payout` | [payouts](payouts.md#read) |
+| `$suqo->bankAccounts->list(…)` | `list<BankAccount>` | [bank-accounts](bank-accounts.md#list) |
+| `$suqo->bankAccounts->create(…)` | `BankAccount` | [bank-accounts](bank-accounts.md#create) |
+| `$suqo->bankAccounts->read(…)` | `BankAccount` | [bank-accounts](bank-accounts.md#read) |
+| `$suqo->bankAccounts->update(…)` | `BankAccount` | [bank-accounts](bank-accounts.md#update) |
+| `$suqo->bankAccounts->delete(…)` | `void` | [bank-accounts](bank-accounts.md#delete) |
+| `$suqo->bankAccounts->sendOtp(…)` | `DetailResponse` | [bank-accounts](bank-accounts.md#sendotp) |
+| `$suqo->byop->paymentMethods(…)` | `list<PaymentMethod>` | [byop](byop.md#paymentmethods) |
+| `$suqo->byop->updateCredentials(…)` | `DetailResponse` | [byop](byop.md#updatecredentials) |
+| `$suqo->byop->updateFee(…)` | `ByopFee` | [byop](byop.md#updatefee) |
 | `$suqo->webhooks->list(…)` | `list<WebhookEndpoint>` | [webhooks](webhooks.md#list) |
 | `$suqo->webhooks->create(…)` | `WebhookEndpoint` | [webhooks](webhooks.md#create) |
 | `$suqo->webhooks->read(…)` | `WebhookEndpoint` | [webhooks](webhooks.md#read) |
@@ -65,6 +83,7 @@ Everything callable, in one table.
 | `WebhookEvent::parse(…)` | `WebhookEvent\|string\|null` | [models](models.md#webhookevent) |
 | `IntervalType::parse(…)` | `IntervalType\|string\|null` | [models](models.md#intervaltype) |
 | `CheckoutItem::billingPeriod(…)` / `::inline(…)` | `CheckoutItem` | [models](models.md#checkoutitem) |
+| `PlanChangeParams::billingPeriod(…)` / `::inline(…)` | `PlanChangeParams` | [models](models.md#planchangeparams) |
 | `<Params>::toWire()` / `::fromWire(…)` | `array` / that params object | [models](models.md#params-objects) |
 | `Cancellation::none()` / `->cancel()` / `->isCancelled()` | `Cancellation` / `void` / `bool` | [http](http.md#cancellation) |
 | `Pagination::autoPage(…)` | `Generator<int, T>` | [http](http.md#paginationautopage) |

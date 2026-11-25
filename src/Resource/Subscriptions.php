@@ -10,10 +10,12 @@ use Suqo\Endpoints;
 use Suqo\Model\CheckoutSession;
 use Suqo\Model\CreateSubscriptionResponse;
 use Suqo\Model\MessageResponse;
+use Suqo\Model\PlanChangeQuote;
 use Suqo\Model\Subscription;
 use Suqo\Model\SubscriptionPage;
 use Suqo\Pagination;
 use Suqo\Params\CreateSubscriptionParams;
+use Suqo\Params\PlanChangeParams;
 use Suqo\Params\UpdateBillingCycleParams;
 
 /**
@@ -200,5 +202,60 @@ final class Subscriptions extends AbstractResource
         );
 
         return CheckoutSession::fromWire($response->object());
+    }
+
+    /**
+     * POST subscription change-preview — what moving the subscription to
+     * another price would cost (upgrade) or how many days it would add
+     * (downgrade). Changes nothing.
+     *
+     * A plan that cannot change — same price, expired, unpaid, cancelled, or a
+     * change payment already pending — answers 422 with a `detail`.
+     *
+     * @param string $id The subscription UUID.
+     *
+     * @throws \Suqo\Exception\SuqoError
+     */
+    public function changePreview(
+        string $id,
+        PlanChangeParams $params,
+        ?Cancellation $cancellation = null,
+    ): PlanChangeQuote {
+        $response = $this->transport->request(
+            'POST',
+            Endpoints::subscriptionChangePreview($id),
+            $params->toWire(),
+            [],
+            $cancellation,
+        );
+
+        return PlanChangeQuote::fromWire($response->object());
+    }
+
+    /**
+     * POST subscription change — recalculate and apply a plan change.
+     *
+     * A downgrade or a free switch applies now and returns no checkout. An
+     * upgrade returns `checkoutUrl`: the plan switches once the buyer pays
+     * there, and the link expires after 30 minutes. Not retried for you.
+     *
+     * @param string $id The subscription UUID.
+     *
+     * @throws \Suqo\Exception\SuqoError
+     */
+    public function change(
+        string $id,
+        PlanChangeParams $params,
+        ?Cancellation $cancellation = null,
+    ): PlanChangeQuote {
+        $response = $this->transport->request(
+            'POST',
+            Endpoints::subscriptionChange($id),
+            $params->toWire(),
+            [],
+            $cancellation,
+        );
+
+        return PlanChangeQuote::fromWire($response->object());
     }
 }

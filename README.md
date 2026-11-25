@@ -162,6 +162,30 @@ Nothing on a subscription says whether it is recurring. Match
 period's `intervalType`: `one_time` cannot be cancelled, resumed or rescheduled,
 and is left out of the list counters.
 
+### Changing plan
+
+Preview first — it changes nothing — then apply. A downgrade or a free switch
+applies at once; an upgrade returns a `checkoutUrl` and switches once the buyer
+pays (the link lasts 30 minutes).
+
+```php
+use Suqo\Params\PlanChangeParams;
+
+$target = PlanChangeParams::billingPeriod('pbp_7h2m4q');   // or ::inline(name:, amount:, …)
+
+$quote = $suqo->subscriptions->changePreview($subscriptionId, $target);
+echo $quote->type, ': ', $quote->amountDue, ' NPR due, expires ', $quote->newExpiryDate, PHP_EOL;
+
+$result = $suqo->subscriptions->change($subscriptionId, $target);
+if ($result->checkoutUrl !== null) {
+    echo 'collect payment at ', $result->checkoutUrl, PHP_EOL;
+}
+```
+
+A plan that cannot change — same price, expired, unpaid, cancelled, or a change
+payment already pending — answers 422, surfaced as a `SuqoError` whose `status`
+is `422`.
+
 ### Subscription status
 
 Known values arrive as a `SubscriptionStatus` case; a value the server adds later
@@ -430,9 +454,97 @@ One webhook per event per account. The endpoint must use https and resolve only
 to public addresses, checked both when you register it and again at delivery
 time. `list()` is the API's one unpaginated collection: a bare array.
 
+## Payouts
+
+_Full reference: [docs/payouts.md](docs/payouts.md). Runnable:
+[examples/request_payout.php](examples/request_payout.php)._
+
+A payout moves everything currently due to your verified bank account, less
+gateway fees, the platform fee and unbilled SMS usage.
+
+```php
+use Suqo\Exception\ValidationError;
+
+try {
+    $payout = $suqo->payouts->create();              // takes no body
+} catch (ValidationError $e) {
+    // pending_payout_request_exists, bank_account_not_verified, no_transactions_due, …
+    echo $e->fieldErrors['code'][0] ?? $e->getMessage(), PHP_EOL;
+}
+
+foreach ($suqo->payouts->autoPaging() as $payout) {
+    echo $payout->payoutId, ' ', $payout->status, ' ', $payout->netAmount, PHP_EOL;
+}
+
+$payout = $suqo->payouts->read('PYT-MF4G9W-CTEP55');  // PENDING → COMPLETED
+```
+
+Only one payout may be pending at a time, so a repeat after a success answers
+400 instead of paying twice. Amounts are decimal strings at up to three places.
+
+## Bank accounts
+
+_Full reference: [docs/bank-accounts.md](docs/bank-accounts.md). Runnable:
+[examples/manage_bank_account.php](examples/manage_bank_account.php)._
+
+The account payouts are paid to — one per seller. It starts unverified; a
+6-digit code emailed to the seller verifies it.
+
+```php
+use Suqo\Params\BankAccountParams;
+use Suqo\Params\BankAccountUpdateParams;
+
+$account = $suqo->bankAccounts->create(new BankAccountParams(
+    bankName: 'Nabil Bank',
+    accountName: 'Himalayan Tea Pvt. Ltd.',
+    accountNumber: '0010012345214521',
+    branch: 'Kathmandu',
+));
+
+$suqo->bankAccounts->sendOtp($account->id);           // emailed, valid 10 minutes
+
+// Verify — optionally editing in the same call. Every edit needs a fresh code.
+$account = $suqo->bankAccounts->update($account->id, new BankAccountUpdateParams(code: 123456));
+
+echo $account->accountNumberMasked, ' verified ', $account->verifiedAt, PHP_EOL;
+```
+
+`id` is an integer. `list()` is unpaginated — a bare array. Editing or deleting
+is refused while a payout to the account is pending.
+
+## BYOP
+
+_Full reference: [docs/byop.md](docs/byop.md). Runnable:
+[examples/manage_byop.php](examples/manage_byop.php)._
+
+Bring your own payment: collect into your own gateway account. SUQO switches an
+account to BYOP; until then the writes answer 403.
+
+```php
+use Suqo\Params\ByopCredentialsParams;
+use Suqo\Params\ByopFeeParams;
+
+foreach ($suqo->byop->paymentMethods() as $method) {
+    echo $method->paymentType, ' ', $method->paymentTypeId,
+         ' configured=', var_export($method->isConfigured, true),
+         ' verified=', var_export($method->isVerified, true), PHP_EOL;
+}
+
+// The full set of the gateway's fields, under wire names. Never returned.
+$suqo->byop->updateCredentials($paymentTypeId, new ByopCredentialsParams([
+    'product_code' => 'EPAYTEST',
+    'merchant_secret' => getenv('ESEWA_SECRET'),
+]));
+
+$suqo->byop->updateFee($paymentTypeId, new ByopFeeParams('1.75'));   // null clears it
+```
+
+Credentials are checked against the gateway in the background — read
+`isVerified` on `paymentMethods()` afterwards.
+
 ## Examples
 
-Seven runnable scripts in [examples/](examples/). Each takes the key from
+Ten runnable scripts in [examples/](examples/). Each takes the key from
 `$SUQO_API_KEY`, so none of them needs editing:
 
 | Script                                                      | What it shows                                                                                                    |
@@ -442,8 +554,11 @@ Seven runnable scripts in [examples/](examples/). Each takes the key from
 | [list_customers.php](examples/list_customers.php)           | Auto-pages the customer records, then reads one back by its public id.                                           |
 | [webhook_handler.php](examples/webhook_handler.php)         | A complete endpoint: verify the signature against the raw bytes, then acknowledge.                               |
 | [checkout_session.php](examples/checkout_session.php)       | Opens a checkout session from a `pbpId` plus an inline line, prints the pay URL, reads it back.                   |
-| [manage_subscription.php](examples/manage_subscription.php) | Reads one subscription, tells recurring from one-time, cancels, resumes, and renews it.                          |
+| [manage_subscription.php](examples/manage_subscription.php) | Reads one subscription, tells recurring from one-time, cancels, resumes, renews it, and previews a plan change. |
 | [manage_webhooks.php](examples/manage_webhooks.php)         | Reads the signing secret, registers an endpoint, sends a test delivery, pauses it, deletes it.                   |
+| [manage_bank_account.php](examples/manage_bank_account.php) | Adds a bank account and emails its code, or verifies it with the code you pass.                                 |
+| [request_payout.php](examples/request_payout.php)           | Requests a payout, reports why when it is refused, and lists past payouts.                                       |
+| [manage_byop.php](examples/manage_byop.php)                 | Lists payment methods with their BYOP state, and sets a processing fee on one.                                   |
 
 ```bash
 SUQO_API_KEY=su_test_key_… php examples/list_products.php

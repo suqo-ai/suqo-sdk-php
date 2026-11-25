@@ -9,8 +9,11 @@ use Suqo\Http\RetryPolicy;
 use Suqo\Http\Transport;
 use Suqo\Http\UrlBuilder;
 use Suqo\Logging\Logger;
+use Suqo\Resource\BankAccounts;
+use Suqo\Resource\Byop;
 use Suqo\Resource\CheckoutSessions;
 use Suqo\Resource\Customers;
+use Suqo\Resource\Payouts;
 use Suqo\Resource\Products;
 use Suqo\Resource\Subscriptions;
 use Suqo\Resource\Webhooks;
@@ -47,6 +50,13 @@ final class SuqoClient
      * which needs no client at all.
      */
     public readonly Webhooks $webhooks;
+
+    public readonly Payouts $payouts;
+
+    public readonly BankAccounts $bankAccounts;
+
+    /** Bring-your-own-payment: payment methods, gateway credentials and fees. */
+    public readonly Byop $byop;
 
     private readonly Transport $transport;
 
@@ -95,6 +105,9 @@ final class SuqoClient
         $this->customers = new Customers($this->transport);
         $this->checkoutSessions = new CheckoutSessions($this->transport);
         $this->webhooks = new Webhooks($this->transport);
+        $this->payouts = new Payouts($this->transport);
+        $this->bankAccounts = new BankAccounts($this->transport);
+        $this->byop = new Byop($this->transport);
     }
 
     /**

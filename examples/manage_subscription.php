@@ -3,15 +3,16 @@
 declare(strict_types=1);
 
 /**
- * Read one subscription, schedule its cancellation, undo that, and open a
- * checkout session for its next payment.
+ * Read one subscription, schedule its cancellation, undo that, open a
+ * checkout session for its next payment, and — given a second argument —
+ * preview moving it onto another price.
  *
  * None of this applies to a one-time purchase: it cannot be cancelled, resumed
  * or rescheduled, and nothing on the subscription record says which kind it is —
  * match its pbpId against the catalogue and read that billing period's
  * intervalType, as this script does.
  *
- * SUQO_API_KEY=su_test_key_… php examples/manage_subscription.php <subscription uuid>
+ * SUQO_API_KEY=su_test_key_… php examples/manage_subscription.php <subscription uuid> [<pbp_id to preview>]
  */
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -21,12 +22,14 @@ use Suqo\Exception\SuqoError;
 use Suqo\Exception\ValidationError;
 use Suqo\IntervalType;
 use Suqo\Model\SubscriptionStatus;
+use Suqo\Params\PlanChangeParams;
 use Suqo\SuqoClient;
 
 $subscriptionId = $argv[1] ?? null;
+$targetPbpId = $argv[2] ?? null;
 
 if ($subscriptionId === null) {
-    fwrite(STDERR, "usage: manage_subscription.php <subscription uuid>\n");
+    fwrite(STDERR, "usage: manage_subscription.php <subscription uuid> [<pbp_id>]\n");
     exit(2);
 }
 
@@ -76,12 +79,24 @@ try {
 
     echo PHP_EOL, 'renew at ', $session->checkoutUrl ?? '-', PHP_EOL;
     echo 'expires  ', $session->expiresAt ?? '-', PHP_EOL;
+
+    // What moving onto another price would cost. A preview changes nothing;
+    // subscriptions->change() with the same target applies it, returning a
+    // checkoutUrl on an upgrade.
+    if ($targetPbpId !== null) {
+        $quote = $suqo->subscriptions->changePreview($subscriptionId, PlanChangeParams::billingPeriod($targetPbpId));
+
+        echo PHP_EOL, 'change   ', $quote->type ?? '-', ' (', $quote->basis ?? '-', ')', PHP_EOL;
+        echo 'due      ', $quote->amountDue ?? 0, ' NPR', PHP_EOL;
+        echo 'days +   ', $quote->daysAdded ?? 0, ', expires ', $quote->newExpiryDate ?? '-', PHP_EOL;
+    }
 } catch (ValidationError $e) {
     // cancel, resume and renew report an illegal state transition as a bare list
     // of messages rather than a field-keyed object, so read getMessage().
     fwrite(STDERR, $e->getMessage() . PHP_EOL);
     exit(1);
 } catch (NotFoundError $e) {
+    // Also a pbp_id that is not one of yours.
     fwrite(STDERR, sprintf("no such subscription: %s\n", $e->getMessage()));
     exit(1);
 } catch (SuqoError $e) {

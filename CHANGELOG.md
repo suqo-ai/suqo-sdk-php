@@ -8,7 +8,42 @@ project follows [Semantic Versioning](https://semver.org/) as described in
 
 ## [Unreleased]
 
-_Nothing yet._
+Additive — a **MINOR** release under [VERSIONING.md](VERSIONING.md). Syncs the
+`/api/v1` routes the API gained since 1.1.0, except sub-sellers. No existing
+class, method, property type or exception parent moves.
+
+### Added
+
+- `subscriptions->changePreview()` and `->change()` — preview, then apply, a
+  move onto another price (`POST /subscriptions/{id}/change-preview/` and
+  `/change/`). Adds `PlanChangeParams`, whose `billingPeriod()` and `inline()`
+  named constructors keep the two target shapes apart like `CheckoutItem`, and
+  `PlanChangeQuote`. An upgrade returns a `checkoutUrl`; a plan that cannot
+  change answers 422, which surfaces as a `SuqoError` with `status` 422.
+- `$suqo->payouts` — `list`, `autoPaging`, `create`, `read`. Adds `Payout`.
+  Amounts are decimal strings at up to three places.
+- `$suqo->bankAccounts` — `list` (unpaginated), `create`, `read`, `update`
+  (verifies with the emailed OTP), `delete`, `sendOtp`. Adds `BankAccount`,
+  `BankAccountParams` and `BankAccountUpdateParams`.
+- `$suqo->byop` — `paymentMethods` (unpaginated), `updateCredentials`,
+  `updateFee`. Adds `PaymentMethod`, `ByopFee`, `ByopCredentialsParams` and
+  `ByopFeeParams`.
+
+### Not yet exposed
+
+- Sub-sellers, deliberately left for a later release: `GET /sub-sellers/`,
+  `POST /sub-sellers/registration/`, `PATCH /sub-sellers/{usr_id}/kyc-resubmit/`
+  and the `Suqo-Account` header for acting as a sub-seller.
+
+### Changed
+
+- `Endpoints` gained the new routes and interpolators; every URL literal still
+  lives there alone (I4).
+- Documentation: new `docs/payouts.md`, `docs/bank-accounts.md`,
+  `docs/byop.md`; plan change in `docs/subscriptions.md`;
+  three new runnable examples — `request_payout.php`,
+  `manage_bank_account.php`, `manage_byop.php` — and a plan-change preview in
+  `manage_subscription.php`.
 
 ## [1.1.0] - 2026-10-05
 
