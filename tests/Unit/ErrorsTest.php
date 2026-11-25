@@ -17,6 +17,7 @@ use Suqo\Exception\PermissionDeniedError;
 use Suqo\Exception\RateLimitError;
 use Suqo\Exception\ServerError;
 use Suqo\Exception\SuqoError;
+use Suqo\Exception\UnprocessableError;
 use Suqo\Exception\ValidationError;
 
 /**
@@ -105,6 +106,23 @@ final class ErrorsTest extends TestCase
         self::assertSame('Not found.', ErrorMapper::map(404, null, 'req_1')->getMessage());
     }
 
+    public function testUnprocessableMapsTo422Type(): void
+    {
+        self::assertSame(UnprocessableError::class, ErrorMapper::map(422, null, 'req_1')::class);
+    }
+
+    public function testUnprocessableMessageIsTheDetail(): void
+    {
+        $error = ErrorMapper::map(422, ['detail' => 'Resume the subscription before changing its plan.'], 'req_1');
+
+        self::assertSame('Resume the subscription before changing its plan.', $error->getMessage());
+    }
+
+    public function testUnprocessableHasADefaultMessage(): void
+    {
+        self::assertSame('Unprocessable request.', ErrorMapper::map(422, null, 'req_1')->getMessage());
+    }
+
     public function testE8RateLimited(): void
     {
         $error = ErrorMapper::map(429, null, 'req_1');
@@ -151,6 +169,7 @@ final class ErrorsTest extends TestCase
             [ValidationError::class],
             [NotFoundError::class],
             [RateLimitError::class],
+            [UnprocessableError::class],
             [ServerError::class],
             [NetworkError::class],
             [CancelledError::class],
@@ -196,7 +215,7 @@ final class ErrorsTest extends TestCase
 
     public function testFieldErrorsAreAlwaysPresentEvenWhenNotApplicable(): void
     {
-        foreach ([401, 403, 404, 429, 500, 418] as $status) {
+        foreach ([401, 403, 404, 422, 429, 500, 418] as $status) {
             self::assertSame([], ErrorMapper::map($status, null, 'req_1')->fieldErrors);
         }
     }

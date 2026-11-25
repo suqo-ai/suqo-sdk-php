@@ -375,9 +375,8 @@ missing inline field, an amount under 50, an interval out of range or
 `one_time`. `NotFoundError` on 404 — the subscription, or a `pbp_id` that is not
 yours. A plan that **cannot** change — the same price, expired, unpaid,
 cancelled, the target unavailable, or a change payment already pending —
-answers **422** with a `detail`; no exception class is dedicated to 422, so it
-surfaces as a `SuqoError` (concretely `ServerError`) whose `status` is `422`
-and whose message is that `detail`. Not retried.
+answers **422**, raised as `UnprocessableError` whose message is the body's
+`detail`. Not retried.
 
 ```php
 use Suqo\Params\PlanChangeParams;
@@ -388,6 +387,16 @@ $quote = $suqo->subscriptions->changePreview(
 );
 
 echo $quote->type, ' ', $quote->amountDue, ' NPR, expires ', $quote->newExpiryDate, PHP_EOL;
+```
+
+```php
+use Suqo\Exception\UnprocessableError;
+
+try {
+    $suqo->subscriptions->change($id, PlanChangeParams::billingPeriod('pbp_7h2m4q'));
+} catch (UnprocessableError $e) {
+    echo $e->getMessage(), PHP_EOL;   // "Resume the subscription before changing its plan."
+}
 ```
 
 ## `change`
@@ -413,7 +422,7 @@ recalculate and apply the change. Same parameters, errors and return type as
   the plan as it is.
 
 A write, so it is not retried for you. A second `change` while an upgrade
-payment is pending answers 422.
+payment is pending raises `UnprocessableError`.
 
 ```php
 $result = $suqo->subscriptions->change(

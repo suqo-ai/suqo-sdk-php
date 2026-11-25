@@ -183,8 +183,8 @@ if ($result->checkoutUrl !== null) {
 ```
 
 A plan that cannot change — same price, expired, unpaid, cancelled, or a change
-payment already pending — answers 422, surfaced as a `SuqoError` whose `status`
-is `422`.
+payment already pending — answers 422, raised as `UnprocessableError` with the
+reason as its message.
 
 ### Subscription status
 
