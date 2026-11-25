@@ -8,6 +8,10 @@ project follows [Semantic Versioning](https://semver.org/) as described in
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.2.0] - 2026-11-25
+
 Additive — a **MINOR** release under [VERSIONING.md](VERSIONING.md). Syncs the
 `/api/v1` routes the API gained since 1.1.0, except sub-sellers. No existing
 class, method, property type or exception parent moves.
